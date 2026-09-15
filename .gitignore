@@ -1,11 +1,73 @@
-*.iml
+# --- Gradle -----------------------------------------------------------------
 .gradle/
-local.properties
-.idea/
-.DS_Store
 build/
+gradle-app.setting
+.gradletasknamecache
+
+# --- Android build output ---------------------------------------------------
+# Signed output lands in <module>/release/ rather than <module>/build/. Kept
+# one level deep on purpose so it cannot swallow a src/release/ source set.
+/*/release/
 captures/
 .externalNativeBuild/
 .cxx/
 *.apk
+*.aab
+*.ap_
+*.dex
+*.class
+output.json
+output-metadata.json
+lint-results*.html
+lint-results*.xml
+
+# --- Machine-specific -------------------------------------------------------
+# Points at this machine's SDK; never the same on two checkouts.
+local.properties
+
+# --- Secrets ----------------------------------------------------------------
+*.jks
 *.keystore
+keystore.properties
+signing.properties
+secrets.properties
+google-services.json
+.env
+.env.*
+
+# --- Kotlin / JVM -----------------------------------------------------------
+.kotlin/
+kotlin-js-store/
+hs_err_pid*
+replay_pid*
+*.hprof
+
+# --- IDE --------------------------------------------------------------------
+.idea/
+*.iml
+*.ipr
+*.iws
+.navigation/
+.vscode/
+*.swp
+*~
+
+# --- macOS ------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.DocumentRevisions-V100
+.TemporaryItems
+.Trashes
+.fseventsd
+.VolumeIcon.icns
+.apdisk
+.com.apple.timemachine.donotpresent
+
+# --- Scratch ----------------------------------------------------------------
+# Notes, captures and throwaway output that stay on this machine only.
+local/
+*.log
