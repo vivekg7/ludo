@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ludo</string>
+    <string name="tagline">Local, offline, pass-and-play</string>
+
+    <string name="seat_human">Human</string>
+    <string name="seat_bot">Bot</string>
+    <string name="seat_off">Off</string>
+    <string name="start_game">Start game</string>
+    <string name="resume_game">Resume saved game</string>
+    <string name="need_two_players">Pick at least two players</string>
+
+    <string name="turn_of">%1$s\'s turn</string>
+    <string name="thinking">Thinking…</string>
+    <string name="tap_to_roll">Tap the die to roll</string>
+    <string name="pick_token">Pick a token to move</string>
+    <string name="no_move">No legal move with a %1$d</string>
+    <string name="three_sixes">Three sixes in a row — turn forfeited</string>
+    <string name="captured">Captured! Roll again</string>
+    <string name="token_home">Home! Roll again</string>
+    <string name="rolled_six">Six — roll again</string>
+    <string name="wins">%1$s wins!</string>
+    <string name="new_game">New game</string>
+</resources>

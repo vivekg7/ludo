@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Platform Material theme: pulling in AppCompat only for theming would
+         cost more APK than the entire rest of the app. -->
+    <style name="LudoTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/board_bg</item>
+        <item name="android:colorAccent">@color/accent</item>
+    </style>
+</resources>
