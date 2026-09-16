@@ -1,4 +1,4 @@
-package com.vivek.ludo
+package com.crylo.ludo
 
 import android.app.Activity
 import android.content.Context

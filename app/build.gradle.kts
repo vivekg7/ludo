@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace = "com.vivek.ludo"
+    namespace = "com.crylo.ludo"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.vivek.ludo"
+        applicationId = "com.crylo.ludo"
         minSdk = 21
         targetSdk = 36
         versionCode = 1

@@ -1,4 +1,4 @@
-package com.vivek.ludo
+package com.crylo.ludo
 
 /** Who is sitting in one of the four seats. */
 enum class Seat { NONE, HUMAN, BOT }

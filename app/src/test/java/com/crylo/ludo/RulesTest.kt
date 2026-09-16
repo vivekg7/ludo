@@ -1,4 +1,4 @@
-package com.vivek.ludo
+package com.crylo.ludo
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals

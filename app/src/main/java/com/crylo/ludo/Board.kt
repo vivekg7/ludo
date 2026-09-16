@@ -1,4 +1,4 @@
-package com.vivek.ludo
+package com.crylo.ludo
 
 /**
  * Static geometry of a standard 15x15 Ludo board. Everything here is derived
