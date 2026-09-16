@@ -117,6 +117,9 @@ class GameActivity : Activity() {
             return
         }
 
+        // Set before the restored-roll check below, which returns early: a game
+        // saved with the dice rolled would otherwise come back with no banner.
+        status.text = getString(R.string.turn_of, names[state.current])
         board.turn = state.current
         die.tint = Board.colors[state.current]
         die.face = state.die
@@ -127,7 +130,6 @@ class GameActivity : Activity() {
             return
         }
 
-        status.text = getString(R.string.turn_of, names[state.current])
         if (state.isBot(state.current)) {
             hint.text = getString(R.string.thinking)
             die.rollable = false
