@@ -139,6 +139,10 @@ can be told apart; the turn banner uses the same names.
   the state would jump to the next player while the last one's token was still
   moving. `GameActivity` sets it in `beginTurn`, alongside the banner and the
   die's colour, so all three change together.
+- **Yards have a pocket per token**, so a yard whose tokens are out reads as
+  waiting for them, not as blank.
+- **An arrow in each colour** sits on the last ring square before that colour's
+  home run, pointing in, to show where its tokens turn off the ring.
 
 ## Sound
 

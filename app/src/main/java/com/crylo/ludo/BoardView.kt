@@ -14,6 +14,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
 import kotlin.math.abs
+import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.hypot
@@ -76,6 +77,7 @@ class BoardView(context: Context) : View(context) {
     private val rect = RectF()
     private val path = Path()
     private val star = Path()
+    private val arrow = Path()
 
     // Scratch space for Board.locate, reused to keep onDraw allocation-free.
     private val here = FloatArray(2)
@@ -105,6 +107,7 @@ class BoardView(context: Context) : View(context) {
 
     init {
         buildStar()
+        buildArrow()
     }
 
     fun showState(newState: GameState) {
@@ -201,6 +204,7 @@ class BoardView(context: Context) : View(context) {
         drawPaper(canvas)
         drawYards(canvas)
         drawRing(canvas)
+        drawHomeArrows(canvas)
         drawHomeRuns(canvas)
         drawCentre(canvas)
         layOutTokens(game)
@@ -259,6 +263,18 @@ class BoardView(context: Context) : View(context) {
             rect.inset(cell * 0.75f, cell * 0.75f)
             canvas.drawRoundRect(rect, cell * 0.25f, cell * 0.25f, fill)
 
+            // A pocket for each token, so a yard reads as waiting for its
+            // tokens to come back rather than as empty once they have left.
+            stroke.color = Board.colors[player]
+            stroke.strokeWidth = cell * 0.09f
+            fill.color = blend(Board.colors[player], PAPER, POCKET_TINT)
+            for (slot in 0 until Board.TOKENS_PER_PLAYER) {
+                Board.locate(player, 0, slot, here)
+                canvas.drawCircle(here[0] * cell, here[1] * cell, cell * POCKET_RADIUS, fill)
+                canvas.drawCircle(here[0] * cell, here[1] * cell, cell * POCKET_RADIUS, stroke)
+            }
+            stroke.strokeWidth = (cell * 0.05f).coerceAtLeast(1f)
+
             // Empty seats are greyed out so it is obvious who is playing.
             if (state?.seats?.get(player) == Seat.NONE) {
                 fill.color = 0xB3F6F1E4.toInt()
@@ -282,6 +298,27 @@ class BoardView(context: Context) : View(context) {
             canvas.drawRect(rect, stroke)
 
             if (owner == null && index in Board.safe) drawStar(canvas)
+        }
+    }
+
+    /**
+     * An arrow in each player's colour on the last ring square before its home
+     * run, pointing the way in, so it is clear where a token turns off.
+     */
+    private fun drawHomeArrows(canvas: Canvas) {
+        for (player in 0 until Board.PLAYERS) {
+            val turnOff = Board.ring[Board.ringIndex(player, Board.LAST_RING_STEP)]
+            val entry = Board.homeRun[player][0]
+            val dx = (Board.colOf(entry) - Board.colOf(turnOff)).toFloat()
+            val dy = (Board.rowOf(entry) - Board.rowOf(turnOff)).toFloat()
+
+            canvas.save()
+            canvas.translate((Board.colOf(turnOff) + 0.5f) * cell, (Board.rowOf(turnOff) + 0.5f) * cell)
+            canvas.rotate(Math.toDegrees(atan2(dy, dx).toDouble()).toFloat())
+            canvas.scale(cell, cell)
+            fill.color = Board.colors[player]
+            canvas.drawPath(arrow, fill)
+            canvas.restore()
         }
     }
 
@@ -465,6 +502,19 @@ class BoardView(context: Context) : View(context) {
         star.close()
     }
 
+    /** A right-pointing arrow in cell units, centred on the origin. */
+    private fun buildArrow() {
+        arrow.reset()
+        arrow.moveTo(-0.36f, -0.09f)
+        arrow.lineTo(0.02f, -0.09f)
+        arrow.lineTo(0.02f, -0.26f)
+        arrow.lineTo(0.36f, 0f)
+        arrow.lineTo(0.02f, 0.26f)
+        arrow.lineTo(0.02f, 0.09f)
+        arrow.lineTo(-0.36f, 0.09f)
+        arrow.close()
+    }
+
     private fun startPulse() {
         if (pulser != null) return
         pulser = ValueAnimator.ofFloat(0f, 1f).apply {
@@ -494,12 +544,25 @@ class BoardView(context: Context) : View(context) {
         const val LABEL_CELLS = 2f
         const val TALL_CELLS = Board.GRID + 2 * LABEL_CELLS
 
+        const val POCKET_RADIUS = 0.6f
+        const val POCKET_TINT = 0.28f
+
         const val PAPER = 0xFFF6F1E4.toInt()
         const val GRID_LINE = 0xFF8C8674.toInt()
         const val SAFE_TINT = 0xFFE4DCC4.toInt()
         const val STAR = 0xFF9A9079.toInt()
         const val TOKEN_EDGE = 0xFF2B2B2B.toInt()
         const val NAME_IDLE = 0xFF9AA3AF.toInt()
+
+        /** [top] laid over [bottom] at the given opacity, both fully opaque. */
+        fun blend(top: Int, bottom: Int, amount: Float): Int {
+            fun mix(shift: Int): Int {
+                val a = (top shr shift) and 0xFF
+                val b = (bottom shr shift) and 0xFF
+                return ((a * amount + b * (1 - amount)) + 0.5f).toInt() shl shift
+            }
+            return (0xFF shl 24) or mix(16) or mix(8) or mix(0)
+        }
     }
 }
 
