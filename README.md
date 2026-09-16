@@ -177,6 +177,13 @@ on), are written to the state the instant the move is chosen. Leaving the roll
 in place until the animation finished would let a game saved during it restore
 with the token already moved and the same roll still to play.
 
+The same encoding is kept in the activity's saved instance state. Android
+rebuilds `GameActivity` from its original intent after a configuration change
+(dark mode, font size, split screen) or after killing the process in the
+background, and for a game started from the setup screen that intent means
+"new game": without the saved instance state the game would restart, and the
+next `onPause` would write the fresh game over the real save.
+
 ## License
 
 GPL-3.0. See [LICENSE](LICENSE).

@@ -51,7 +51,12 @@ class GameActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        state = (if (intent.getBooleanExtra(EXTRA_RESUME, false)) Saves.load(this) else null)
+        // Android rebuilds this activity from its original intent after a
+        // configuration change or after killing the process in the background.
+        // That intent says "new game", so without the state kept below the
+        // game would restart, and the next onPause would save over the real one.
+        state = savedInstanceState?.getString(KEY_STATE)?.let(GameState::decode)
+            ?: (if (intent.getBooleanExtra(EXTRA_RESUME, false)) Saves.load(this) else null)
             ?: newStateFromIntent()
 
         val profiles = Saves.profiles(this).associateBy { it.id }
@@ -239,6 +244,11 @@ class GameActivity : Activity() {
         if (state.winner < 0) Saves.save(this, state) else Saves.clear(this)
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(KEY_STATE, state.encode())
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacksAndMessages(null)
@@ -307,6 +317,7 @@ class GameActivity : Activity() {
         private const val EXTRA_SEATS = "seats"
         private const val EXTRA_PROFILES = "profiles"
         private const val EXTRA_RESUME = "resume"
+        private const val KEY_STATE = "state"
 
         private const val BOT_THINK_MS = 620L
         private const val AUTO_MOVE_MS = 180L
