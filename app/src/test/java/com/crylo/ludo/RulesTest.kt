@@ -270,10 +270,13 @@ class RulesTest {
         state.steps[Board.firstToken(1)] = Board.FINISH                // green: one home
         state.steps[Board.firstToken(3)] = 40                          // blue: level with red
         assertArrayEquals(intArrayOf(1, 0, 3), Rules.standings(state))
+        assertTrue(Rules.sameStanding(state, 0, 3))
+        assertFalse(Rules.sameStanding(state, 0, 1))
 
         for (t in 0 until Board.TOKENS_PER_PLAYER) state.steps[Board.firstToken(3) + t] = Board.FINISH
         state.winner = 3
         assertArrayEquals(intArrayOf(3, 1, 0), Rules.standings(state))
+        assertFalse(Rules.sameStanding(state, 3, 3))
     }
 }
 

@@ -52,7 +52,16 @@
     <string name="token_home">Home! Roll again</string>
     <string name="rolled_six">Six — roll again</string>
     <string name="wins">%1$s wins!</string>
-    <string name="new_game">New game</string>
+    <string name="rematch">Rematch</string>
+    <string name="change_players">Change players</string>
+    <string name="show_results">Results</string>
+    <string name="results_record">won %1$d of %2$d</string>
+    <string-array name="places">
+        <item>1st</item>
+        <item>2nd</item>
+        <item>3rd</item>
+        <item>4th</item>
+    </string-array>
     <string name="progress">%1$d%% · %2$d/%3$d home</string>
     <string name="names_face_table">Turn the top names to face the far side of the table</string>
     <string name="names_face_holder">Turn the top names back the right way up</string>

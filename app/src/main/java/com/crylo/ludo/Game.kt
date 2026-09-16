@@ -209,7 +209,8 @@ object Rules {
 
     /**
      * Occupied seats in finishing order: the winner, if there is one, then the
-     * rest by tokens home and then by ground covered. Seat order breaks a tie.
+     * rest by tokens home and then by ground covered. Seat order breaks a tie,
+     * which [sameStanding] lets a caller show as a shared place.
      */
     fun standings(state: GameState): IntArray =
         (0 until Board.PLAYERS)
@@ -220,6 +221,11 @@ object Rules {
                     .thenByDescending { state.travelled(it) },
             )
             .toIntArray()
+
+    /** Whether two players are level: neither has won, and they are equally far along. */
+    fun sameStanding(state: GameState, a: Int, b: Int): Boolean =
+        a != state.winner && b != state.winner &&
+            state.tokensHome(a) == state.tokensHome(b) && state.travelled(a) == state.travelled(b)
 
     /** Next occupied seat clockwise. */
     fun nextPlayer(state: GameState): Int {

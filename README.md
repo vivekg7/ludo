@@ -4,7 +4,7 @@ A lightweight, fully offline Ludo game for Android. Pass-and-play with up to
 four people on one device, any seat swappable for a bot, and a profile for each
 person that keeps their wins.
 
-Requires **Android 12 (API 31)** or newer. The signed release APK is **52 KB**.
+Requires **Android 12 (API 31)** or newer. The signed release APK is **55 KB**.
 There are no runtime dependencies beyond the
 Kotlin standard library — no AndroidX, no Compose, no Material. The board and
 die are two custom `View`s drawing on a `Canvas`, the sound effects are
@@ -209,6 +209,17 @@ board; it is white on red, green and blue, and dark on yellow.
   depending on how far the farthest had come. The capture sound and a vibration
   fire as the capturing token lands; the turn carries on once the captured
   tokens are home.
+- **A win opens the results** over a dimmed screen, after a short pause so the
+  winning token is seen arriving, with confetti in the four colours. Everyone is
+  listed in finishing order: the winner, then by tokens home, then by ground
+  covered, and players who are level share a place. Each line shows how far
+  that player got and, for a profile, their record with this game counted.
+  **Rematch** starts the same seats again straight away, with a new seat drawn
+  to roll first; **Change players** goes back to the setup screen. Tapping the
+  dimmed part puts the card away to look at the final board, and a Results
+  button brings it back. A finished game restored after the screen is rebuilt
+  shows the results at once, with no confetti, for the same reason it plays no
+  fanfare. The confetti is skipped when the system has animations turned off.
 - **The phone vibrates** on a person's six, on any capture, and three times on a
   win. It uses `View.performHapticFeedback`, which needs no permission and
   follows the system's touch-feedback setting, so it is off for anyone who has
@@ -277,9 +288,10 @@ cannot be captured, so those tokens can never collide with anything.
 | `Bot.kt`           | One-ply heuristic opponent                                       |
 | `BoardView.kt`     | Draws the board, tokens and seat names; turns taps into choices  |
 | `DieView.kt`       | The die, and its tumble animation                                |
+| `ConfettiView.kt`  | The confetti over the results of a won game                      |
 | `Style.kt`         | Colours, buttons and panels shared by both screens               |
 | `Sounds.kt`        | Synthesises and plays the sound effects                          |
-| `GameActivity.kt`  | The turn loop                                                    |
+| `GameActivity.kt`  | The turn loop, and the results of a won game                     |
 | `SetupActivity.kt` | Seat picker, profile leaderboard and resume                      |
 | `Saves.kt`         | Saved game, profiles, lineup, mute and name facing (preferences) |
 | `Insets.kt`        | Keeps content clear of the system bars under forced edge-to-edge |

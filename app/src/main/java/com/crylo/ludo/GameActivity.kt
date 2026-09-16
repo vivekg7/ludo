@@ -8,6 +8,7 @@ import android.graphics.Typeface
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.HapticFeedbackConstants
 import android.view.View
@@ -16,6 +17,7 @@ import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import kotlin.random.Random
 
@@ -38,7 +40,10 @@ class GameActivity : Activity() {
     private lateinit var die: DieView
     private lateinit var status: TextView
     private lateinit var hint: TextView
-    private lateinit var newGame: Button
+    private lateinit var showResults: Button
+    private lateinit var results: FrameLayout
+    private lateinit var resultsCard: LinearLayout
+    private lateinit var confetti: ConfettiView
     private lateinit var soundToggle: TextView
     private lateinit var facingToggle: TextView
     private lateinit var sounds: Sounds
@@ -216,11 +221,15 @@ class GameActivity : Activity() {
         // also runs for a finished game restored after a rotation.
         if (state.winner >= 0) {
             sounds.play(Sound.WIN)
-            announceWinner()
+            announceWinner(justWon = true)
             // After announceWinner, which clears the handler these are queued on.
             for (i in 0 until WIN_BUZZES) {
                 handler.postDelayed({ buzz(HapticFeedbackConstants.CONFIRM) }, i * WIN_BUZZ_GAP_MS)
             }
+            // The confetti is here for the same reason as the fanfare. The
+            // results wait a moment so the winning token is seen arriving.
+            confetti.burst()
+            handler.postDelayed({ openResults() }, RESULTS_DELAY_MS)
             return
         }
 
@@ -262,7 +271,12 @@ class GameActivity : Activity() {
         }, HAND_OVER_MS)
     }
 
-    private fun announceWinner() {
+    /**
+     * Ends the game on screen. A game restored already won opens its results
+     * straight away; a win that has just happened ([justWon]) opens them from
+     * [afterMove], once the winning token has been seen arriving.
+     */
+    private fun announceWinner(justWon: Boolean = false) {
         handler.removeCallbacksAndMessages(null)
         board.clearHighlights()
         die.rollable = false
@@ -270,8 +284,117 @@ class GameActivity : Activity() {
         board.turn = state.winner
         status.text = getString(R.string.wins, names[state.winner])
         hint.text = ""
-        newGame.visibility = View.VISIBLE
         Saves.clear(this)
+        if (!justWon) openResults()
+    }
+
+    // --- results -----------------------------------------------------------
+
+    /**
+     * Fills and shows the results card over the screen: everyone in finishing
+     * order with how far they got and, for a profile, their record now this
+     * game is counted, and the choice of a rematch or a new lineup.
+     */
+    private fun openResults() {
+        resultsCard.removeAllViews()
+
+        resultsCard.addView(TextView(this).apply {
+            text = getString(R.string.wins, names[state.winner])
+            textSize = 24f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Style.TEXT)
+            gravity = Gravity.CENTER
+        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dp(16) })
+
+        val profiles = Saves.profiles(this).associateBy { it.id }
+        val places = resources.getStringArray(R.array.places)
+        val order = Rules.standings(state)
+        var place = 0
+        order.forEachIndexed { i, player ->
+            // Level players share a place, as in any race.
+            if (i == 0 || !Rules.sameStanding(state, order[i - 1], player)) place = i
+            resultsCard.addView(resultRow(places[place], player, profiles[state.profiles[player]]))
+        }
+
+        resultsCard.addView(Style.button(this, getString(R.string.rematch), Style.Kind.PRIMARY).apply {
+            setOnClickListener { rematch() }
+        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(20) })
+        resultsCard.addView(Style.button(this, getString(R.string.change_players), Style.Kind.SECONDARY).apply {
+            setOnClickListener { finish() }
+        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(8) })
+
+        results.visibility = View.VISIBLE
+        showResults.visibility = View.GONE
+    }
+
+    /** Tucks the results away to look at the final board; the bar can bring them back. */
+    private fun closeResults() {
+        results.visibility = View.GONE
+        showResults.visibility = View.VISIBLE
+    }
+
+    private fun resultRow(place: String, player: Int, profile: Profile?): View {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(6), 0, dp(6))
+        }
+        row.addView(TextView(this).apply {
+            text = place
+            textSize = 14f
+            setTextColor(Style.TEXT_DIM)
+        }, LinearLayout.LayoutParams(dp(36), WRAP_CONTENT))
+        row.addView(View(this).apply {
+            background = Style.seatDot(this@GameActivity, Board.colors[player], true)
+        }, LinearLayout.LayoutParams(dp(14), dp(14)))
+
+        val text = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        text.addView(TextView(this).apply {
+            this.text = names[player]
+            textSize = 16f
+            setTextColor(Style.TEXT)
+            if (player == state.winner) typeface = Typeface.DEFAULT_BOLD
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+        })
+        text.addView(TextView(this).apply {
+            val home = state.tokensHome(player)
+            this.text = getString(R.string.progress, Board.travelPercent(state.travelled(player)), home, Board.TOKENS_PER_PLAYER)
+            textSize = 13f
+            setTextColor(Style.TEXT_DIM)
+        })
+        row.addView(text, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f).apply { leftMargin = dp(12) })
+
+        if (profile != null) {
+            row.addView(TextView(this).apply {
+                this.text = getString(R.string.results_record, profile.wins, profile.played)
+                textSize = 13f
+                setTextColor(Style.TEXT_DIM)
+            }, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { leftMargin = dp(8) })
+        }
+        return row
+    }
+
+    /**
+     * The same seats and profiles again, in place rather than through the
+     * setup screen. The finished game was cleared from the save when it was
+     * won, and the new one is saved like any other when the screen pauses.
+     */
+    private fun rematch() {
+        handler.removeCallbacksAndMessages(null)
+        board.cancelAnimations()
+        confetti.stop()
+        val finished = state
+        state = GameState(finished.seats.copyOf()).also {
+            finished.profiles.copyInto(it.profiles)
+            // Drawn afresh, like any new game, rather than going to the winner.
+            Rules.pickStarter(it, random)
+        }
+        results.visibility = View.GONE
+        showResults.visibility = View.GONE
+        hint.text = ""
+        busy = false
+        beginTurn()
     }
 
     /**
@@ -377,18 +500,55 @@ class GameActivity : Activity() {
         die = DieView(this)
         bar.addView(die, LinearLayout.LayoutParams(dp(76), dp(76)))
 
-        newGame = Button(this).apply {
-            text = getString(R.string.new_game)
+        showResults = Style.button(this, getString(R.string.show_results), Style.Kind.SECONDARY).apply {
             visibility = View.GONE
-            setOnClickListener { finish() }
+            setOnClickListener { openResults() }
         }
-        bar.addView(newGame, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
+        bar.addView(showResults, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
             leftMargin = dp(16)
         })
         root.addView(bar, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
-
         root.padForSystemBars()
-        return root
+
+        // The results and the confetti lie over the whole screen, not just the
+        // board, so the card has room for four players on a short phone.
+        val screen = FrameLayout(this)
+        screen.addView(root, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+        results = buildResults()
+        screen.addView(results, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+        confetti = ConfettiView(this)
+        screen.addView(confetti, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+        return screen
+    }
+
+    /**
+     * A dimmed layer holding the results card, filled in by [openResults].
+     * Tapping the dimmed part puts the card away to show the final board.
+     */
+    private fun buildResults(): FrameLayout {
+        resultsCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = Style.panel(this@GameActivity, Style.SURFACE, radiusDp = 20)
+            setPadding(dp(20), dp(20), dp(20), dp(20))
+            // Taps on the card are its own, not a tap on the dimmed layer behind.
+            isClickable = true
+        }
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+            val centre = FrameLayout(this@GameActivity).apply {
+                setOnClickListener { closeResults() }
+                addView(resultsCard, FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.CENTER).apply {
+                    setMargins(dp(24), dp(24), dp(24), dp(24))
+                })
+            }
+            addView(centre, MATCH_PARENT, MATCH_PARENT)
+        }
+        scroll.padForSystemBars()
+        return FrameLayout(this).apply {
+            setBackgroundColor(SCRIM)
+            visibility = View.GONE
+            addView(scroll, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+        }
     }
 
     private fun showSoundToggle() {
@@ -418,6 +578,8 @@ class GameActivity : Activity() {
 
         private const val WIN_BUZZES = 3
         private const val WIN_BUZZ_GAP_MS = 180L
+        private const val RESULTS_DELAY_MS = 900L
+        private const val SCRIM = 0xB3000000.toInt()
 
         private const val BACKGROUND = 0xFF12161C.toInt()
         private const val ACCENT = 0xFFFFB300.toInt()
