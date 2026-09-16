@@ -1,6 +1,5 @@
 package com.crylo.ludo
 
-import android.os.Build
 import android.view.View
 import android.view.WindowInsets
 
@@ -16,32 +15,12 @@ internal fun View.padForSystemBars() {
     val basePadding = intArrayOf(paddingLeft, paddingTop, paddingRight, paddingBottom)
 
     setOnApplyWindowInsetsListener { view, insets ->
-        val left: Int
-        val top: Int
-        val right: Int
-        val bottom: Int
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val bars = insets.getInsets(WindowInsets.Type.systemBars())
-            left = bars.left
-            top = bars.top
-            right = bars.right
-            bottom = bars.bottom
-        } else {
-            @Suppress("DEPRECATION")
-            left = insets.systemWindowInsetLeft
-            @Suppress("DEPRECATION")
-            top = insets.systemWindowInsetTop
-            @Suppress("DEPRECATION")
-            right = insets.systemWindowInsetRight
-            @Suppress("DEPRECATION")
-            bottom = insets.systemWindowInsetBottom
-        }
-
+        val bars = insets.getInsets(WindowInsets.Type.systemBars())
         view.setPadding(
-            basePadding[0] + left,
-            basePadding[1] + top,
-            basePadding[2] + right,
-            basePadding[3] + bottom,
+            basePadding[0] + bars.left,
+            basePadding[1] + bars.top,
+            basePadding[2] + bars.right,
+            basePadding[3] + bars.bottom,
         )
         insets
     }

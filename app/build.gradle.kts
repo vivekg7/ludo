@@ -1,5 +1,16 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
+}
+
+// Signing credentials live in local/, which is gitignored, so the keystore and
+// its password never reach the repository. A checkout without them still
+// builds release — it just comes out unsigned — so a machine or a CI runner
+// that has no key is not blocked.
+val keystoreProperties = Properties().apply {
+    val file = rootProject.file("local/keystore.properties")
+    if (file.exists()) file.inputStream().use(::load)
 }
 
 android {
@@ -8,15 +19,34 @@ android {
 
     defaultConfig {
         applicationId = "com.crylo.ludo"
-        minSdk = 21
+        minSdk = 31
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
+    }
 
+    signingConfigs {
+        if (keystoreProperties.isNotEmpty()) {
+            create("release") {
+                storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
     }
 
     buildTypes {
         release {
+            // Null when local/keystore.properties is absent, which leaves the
+            // build unsigned rather than failing.
+            signingConfig = signingConfigs.findByName("release")
+
+            // AGP otherwise stamps the git commit into the APK. It is not
+            // worth the bytes here, and a release artefact does not need to
+            // carry the working tree's VCS state.
+            vcsInfo { include = false }
+
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -44,7 +74,16 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    // Play's dependency metadata is a signed blob appended to the APK. Nothing
+    // here is published through Play, and on an APK this small it is a
+    // measurable fraction of the download.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+
     packaging {
+        dex { useLegacyPackaging = true }
         resources.excludes += setOf(
             "META-INF/*.kotlin_module",
             "kotlin/**",

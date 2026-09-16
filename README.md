@@ -3,7 +3,8 @@
 A lightweight, fully offline Ludo game for Android. Pass-and-play with up to
 four people on one device, any seat swappable for a bot.
 
-The release APK is **29 KB**. There are no runtime dependencies beyond the
+Requires **Android 12 (API 31)** or newer. The signed release APK is **31 KB**.
+There are no runtime dependencies beyond the
 Kotlin standard library — no AndroidX, no Compose, no Material. The entire UI
 is two custom `View`s drawing on a `Canvas`, and the app requests no
 permissions and opens no sockets.
@@ -12,11 +13,41 @@ permissions and opens no sockets.
 
 ```sh
 ./gradlew assembleDebug          # debug APK
-./gradlew assembleRelease        # minified + resource-shrunk release APK
+./gradlew assembleRelease        # minified, shrunk and signed release APK
 ./gradlew testDebugUnitTest      # rules engine tests, plain JVM
 ```
 
 `local.properties` must point at an Android SDK with platform 36 installed.
+
+### Signing
+
+`assembleRelease` signs the APK when `local/keystore.properties` exists:
+
+```properties
+storeFile=local/crylo-release.jks
+storePassword=…
+keyAlias=crylo-ludo
+keyPassword=…
+```
+
+`local/` is gitignored, so neither the keystore nor its password reaches the
+repository. A checkout without that file still builds release — the APK just
+comes out unsigned — so a machine or CI runner that has no key is not blocked.
+
+**The keystore is not recoverable.** Lose it and no already-installed copy of
+the app can ever be updated, because Android refuses an update signed by a
+different key. Keep a backup off this machine.
+
+### Why the APK is the size it is
+
+Two packaging choices are deliberate and pull in opposite directions:
+
+- `minSdk 31` lets AGP drop the v1 JAR signature entirely (v2 covers API 24 and
+  up), which is worth about 3.4 KB of `META-INF/`.
+- At `minSdk ≥ 28` AGP stores `classes.dex` uncompressed so Android can map it
+  straight from the APK. That is better on device but costs 22 KB of download,
+  so `packaging { dex { useLegacyPackaging = true } }` compresses it again.
+  Reverse that if startup time ever matters more than download size.
 
 ## Rules
 
