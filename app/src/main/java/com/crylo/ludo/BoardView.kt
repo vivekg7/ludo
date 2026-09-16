@@ -129,6 +129,9 @@ class BoardView(context: Context) : View(context) {
     private val landingX = FloatArray(Board.TOKENS)
     private val landingY = FloatArray(Board.TOKENS)
 
+    // Route dots already drawn this frame, indexed by steps * DOTS_PER_SQUARE.
+    private val routeDrawn = BooleanArray((Board.FINISH + 1) * DOTS_PER_SQUARE)
+
     private var pulse = 0f
     private var pulser: ValueAnimator? = null
 
@@ -275,6 +278,7 @@ class BoardView(context: Context) : View(context) {
         drawArrows(canvas)
         drawHomeRuns(canvas)
         drawCentre(canvas)
+        drawRoutes(canvas, game)
         drawTokens(canvas, game)
         drawLandings(canvas)
         canvas.restore()
@@ -577,12 +581,48 @@ class BoardView(context: Context) : View(context) {
     }
 
     /**
-     * Marks the square each highlighted token would land on: a dot, or a
-     * crosshair where the move captures. Drawn over the tokens so a crosshair
-     * shows around the token it would take.
+     * A faint dotted line along the squares each highlighted token would walk,
+     * drawn under the tokens. Not for a token leaving its yard, whose one step
+     * to the start square needs no route. Tokens stacked on one square, or one
+     * walking a stretch another also walks, share their dots rather than
+     * darkening them.
+     */
+    private fun drawRoutes(canvas: Canvas, game: GameState) {
+        if (highlights.isEmpty() || movingToken >= 0) return
+        routeDrawn.fill(false)
+        fill.color = ROUTE
+        for (token in highlights) {
+            val from = game.steps[token]
+            val to = landing[token]
+            if (from <= 0 || to <= from) continue
+            val player = Board.owner(token)
+            val slot = token % Board.TOKENS_PER_PLAYER
+            // Dots between square centres; the first sits under the token and the
+            // last just short of the landing mark.
+            for (k in from * DOTS_PER_SQUARE + 1 until to * DOTS_PER_SQUARE) {
+                if (routeDrawn[k]) continue
+                routeDrawn[k] = true
+                val low = k / DOTS_PER_SQUARE
+                val frac = (k % DOTS_PER_SQUARE) / DOTS_PER_SQUARE.toFloat()
+                Board.locate(player, low, slot, here)
+                Board.locate(player, low + 1, slot, there)
+                val x = (here[0] + (there[0] - here[0]) * frac) * cell
+                val y = (here[1] + (there[1] - here[1]) * frac) * cell
+                canvas.drawCircle(x, y, cell * 0.05f, fill)
+            }
+        }
+    }
+
+    /**
+     * Marks the square each highlighted token would land on: a faint ring, or
+     * a faint ticked ring round the token the move would capture. Kept quiet and
+     * still, since the pulsing tokens are what asks for a tap; drawn over the
+     * tokens so a capture ring shows round its victim.
      */
     private fun drawLandings(canvas: Canvas) {
         if (highlights.isEmpty() || movingToken >= 0) return
+        stroke.color = LANDING
+        stroke.strokeWidth = cell * 0.05f
         for (token in highlights) {
             val to = landing[token]
             if (to <= 0) continue
@@ -593,25 +633,21 @@ class BoardView(context: Context) : View(context) {
             landingX[token] = x
             landingY[token] = y
 
-            stroke.color = TOKEN_EDGE
             if (landingCaptures[token]) {
-                val r = cell * (0.44f + 0.05f * pulse)
-                stroke.strokeWidth = cell * 0.09f
+                val r = cell * 0.46f
                 canvas.drawCircle(x, y, r, stroke)
+                // Four short ticks outside the ring set a capture apart from a plain landing.
                 for (i in 0 until 4) {
                     val dx = if (i < 2) (if (i == 0) 1f else -1f) else 0f
                     val dy = if (i >= 2) (if (i == 2) 1f else -1f) else 0f
-                    canvas.drawLine(x + dx * r * 0.7f, y + dy * r * 0.7f, x + dx * r * 1.3f, y + dy * r * 1.3f, stroke)
+                    canvas.drawLine(x + dx * r, y + dy * r, x + dx * (r + cell * 0.14f), y + dy * (r + cell * 0.14f), stroke)
                 }
             } else {
-                stroke.alpha = 150 + (105 * pulse).toInt()
-                stroke.strokeWidth = cell * 0.07f
-                canvas.drawCircle(x, y, cell * 0.3f, stroke)
-                stroke.alpha = 255
+                canvas.drawCircle(x, y, cell * 0.2f, stroke)
                 fill.color = Board.colors[player]
-                canvas.drawCircle(x, y, cell * 0.13f, fill)
-                stroke.strokeWidth = cell * 0.04f
-                canvas.drawCircle(x, y, cell * 0.13f, stroke)
+                fill.alpha = 150
+                canvas.drawCircle(x, y, cell * 0.08f, fill)
+                fill.alpha = 255
             }
         }
         stroke.strokeWidth = (cell * 0.05f).coerceAtLeast(1f)
@@ -736,6 +772,8 @@ class BoardView(context: Context) : View(context) {
         /** Width of the coloured border round each yard, in cells. */
         const val BORDER = 0.75f
 
+        const val DOTS_PER_SQUARE = 3
+
         const val POCKET_RADIUS = 0.6f
         const val POCKET_TINT = 0.28f
 
@@ -747,6 +785,8 @@ class BoardView(context: Context) : View(context) {
         const val NAME_IDLE = 0xFF9AA3AF.toInt()
         const val BORDER_TEXT_LIGHT = 0xF2FFFFFF.toInt()
         const val BORDER_TEXT_DARK = 0xB3000000.toInt()
+        const val LANDING = 0x73000000
+        const val ROUTE = 0x40000000
         const val START_ARROW = 0x70000000
 
         /** Whether dark text reads better than white on this colour. */

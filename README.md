@@ -163,11 +163,15 @@ board; it is white on red, green and blue, and dark on yellow.
   it is rolled shows a lightning bolt instead of a blank face and swells gently,
   so it reads as something to tap. Only a die waiting for a person swells; a bot
   rolls on its own.
-- **Picking a token previews where each one lands**: a dot on the square, or a
-  crosshair round the token that move would capture. Tapping the dot or
-  crosshair plays that token, which saves hunting for the right one in a stack.
-  The preview asks `Rules.victims`, the same function `Rules.apply` captures
-  with, so it cannot promise a capture the rules then refuse.
+- **Picking a token previews where each one lands**: a faint ring on the square,
+  or a faint ticked ring round the token that move would capture, with a faint
+  dotted line along the squares on the way. A token leaving its yard gets no
+  line, having only one step to take. The marks are translucent and still on
+  purpose: the pulsing tokens are what ask for a tap, and a louder preview
+  competed with them. Tapping a ring plays that token, which saves hunting for
+  the right one in a stack. The preview asks `Rules.victims`, the same function
+  `Rules.apply` captures with, so it cannot promise a capture the rules then
+  refuse.
 - **A captured token walks home backwards along its own path**, square by
   square, instead of jumping to its yard, so everyone sees what happened and how
   much ground it lost. Every captured token arrives home together, in 0.3–1 s
