@@ -27,6 +27,9 @@ class BoardView(context: Context) : View(context) {
     /** Called when the player taps one of the currently highlighted tokens. */
     var onTokenPicked: ((Int) -> Unit)? = null
 
+    /** Called each time a sliding token reaches the next square on its way. */
+    var onSquareReached: (() -> Unit)? = null
+
     private var state: GameState? = null
     private var highlights = IntArray(0)
 
@@ -106,11 +109,16 @@ class BoardView(context: Context) : View(context) {
         frozenSteps = capturedFrom
 
         val squares = (to - from).coerceAtLeast(1)
+        var reached = from
         mover = ValueAnimator.ofFloat(from.toFloat(), to.toFloat()).apply {
             duration = (squares * MS_PER_SQUARE).coerceIn(MIN_MOVE_MS, MAX_MOVE_MS)
             interpolator = AccelerateDecelerateInterpolator()
             addUpdateListener {
                 movingAt = it.animatedValue as Float
+                if (floor(movingAt).toInt() > reached) {
+                    reached = floor(movingAt).toInt()
+                    onSquareReached?.invoke()
+                }
                 invalidate()
             }
             doOnEnd {

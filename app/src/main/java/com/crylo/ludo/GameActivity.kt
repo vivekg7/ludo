@@ -38,6 +38,8 @@ class GameActivity : Activity() {
     private lateinit var status: TextView
     private lateinit var hint: TextView
     private lateinit var newGame: Button
+    private lateinit var soundToggle: TextView
+    private lateinit var sounds: Sounds
 
     /** What the banner calls each seat: its profile's name, or its colour. */
     private val names = Board.names.copyOf()
@@ -65,9 +67,14 @@ class GameActivity : Activity() {
             profiles[state.profiles[player]]?.let { names[player] = it.name }
         }
 
+        sounds = Sounds()
+        sounds.enabled = Saves.soundOn(this)
+
         setContentView(buildUi())
+        showSoundToggle()
 
         board.onTokenPicked = { token -> play(token) }
+        board.onSquareReached = { sounds.play(Sound.STEP) }
         die.onRollRequested = { roll() }
 
         beginTurn()
@@ -123,7 +130,9 @@ class GameActivity : Activity() {
         die.rollable = false
 
         val face = random.nextInt(6) + 1
+        sounds.play(Sound.ROLL)
         die.roll(face) {
+            sounds.play(Sound.LAND)
             state.die = face
             state.sixStreak = if (face == 6) state.sixStreak + 1 else 0
             resolveRoll(face)
@@ -133,6 +142,7 @@ class GameActivity : Activity() {
     private fun resolveRoll(face: Int) {
         if (state.sixStreak >= Rules.SIX_STREAK_LIMIT) {
             hint.text = getString(R.string.three_sixes)
+            sounds.play(Sound.NO_MOVE)
             handOver()
             return
         }
@@ -142,6 +152,7 @@ class GameActivity : Activity() {
         when {
             moves.isEmpty() -> {
                 hint.text = getString(R.string.no_move, face)
+                sounds.play(Sound.NO_MOVE)
                 handOver()
             }
 
@@ -187,9 +198,17 @@ class GameActivity : Activity() {
     }
 
     private fun afterMove(move: Move) {
+        // Played here, as the move lands, rather than in announceWinner, which
+        // also runs for a finished game restored after a rotation.
         if (state.winner >= 0) {
+            sounds.play(Sound.WIN)
             announceWinner()
             return
+        }
+
+        when {
+            move.captured.isNotEmpty() -> sounds.play(Sound.CAPTURE)
+            move.finished -> sounds.play(Sound.HOME)
         }
 
         hint.text = when {
@@ -239,8 +258,14 @@ class GameActivity : Activity() {
 
     // --- lifecycle ---------------------------------------------------------
 
+    override fun onResume() {
+        super.onResume()
+        sounds.resume()
+    }
+
     override fun onPause() {
         super.onPause()
+        sounds.pause()
         if (state.winner < 0) Saves.save(this, state) else Saves.clear(this)
     }
 
@@ -253,6 +278,7 @@ class GameActivity : Activity() {
         super.onDestroy()
         handler.removeCallbacksAndMessages(null)
         board.cancelAnimations()
+        sounds.release()
     }
 
     // --- ui ----------------------------------------------------------------
@@ -264,13 +290,28 @@ class GameActivity : Activity() {
             setPadding(dp(12), dp(20), dp(12), dp(20))
         }
 
+        // The sound toggle sits at the end of the banner row; the banner is
+        // padded by its width on both sides so the name stays centred.
+        val header = FrameLayout(this)
         status = TextView(this).apply {
             textSize = 20f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
             typeface = Typeface.DEFAULT_BOLD
+            setPadding(dp(TOGGLE_DP), 0, dp(TOGGLE_DP), 0)
         }
-        root.addView(status, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        header.addView(status, FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.CENTER_VERTICAL))
+        soundToggle = TextView(this).apply {
+            textSize = 20f
+            gravity = Gravity.CENTER
+            setOnClickListener {
+                sounds.enabled = !sounds.enabled
+                Saves.setSoundOn(this@GameActivity, sounds.enabled)
+                showSoundToggle()
+            }
+        }
+        header.addView(soundToggle, FrameLayout.LayoutParams(dp(TOGGLE_DP), dp(TOGGLE_DP), Gravity.END or Gravity.CENTER_VERTICAL))
+        root.addView(header, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
 
         hint = TextView(this).apply {
             textSize = 14f
@@ -311,6 +352,11 @@ class GameActivity : Activity() {
         return root
     }
 
+    private fun showSoundToggle() {
+        soundToggle.text = if (sounds.enabled) "\uD83D\uDD0A" else "\uD83D\uDD07" // 🔊 / 🔇
+        soundToggle.contentDescription = getString(if (sounds.enabled) R.string.mute else R.string.unmute)
+    }
+
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
     companion object {
@@ -322,6 +368,8 @@ class GameActivity : Activity() {
         private const val BOT_THINK_MS = 620L
         private const val AUTO_MOVE_MS = 180L
         private const val HAND_OVER_MS = 750L
+
+        private const val TOGGLE_DP = 48
 
         private const val BACKGROUND = 0xFF12161C.toInt()
 

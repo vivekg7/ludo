@@ -4,8 +4,8 @@ import android.content.Context
 
 /**
  * Everything the game keeps between launches, in SharedPreferences: the game
- * in progress, the profiles, and who last sat where. Each encodes to a short
- * string, so there is nothing here worth a database.
+ * in progress, the profiles, who last sat where, and whether sound is on. Each
+ * encodes to a short string, so there is nothing here worth a database.
  */
 object Saves {
 
@@ -14,6 +14,7 @@ object Saves {
     private const val KEY_PROFILES = "profiles"
     private const val KEY_NEXT_PROFILE_ID = "next_profile_id"
     private const val KEY_LINEUP = "lineup"
+    private const val KEY_SOUND = "sound"
 
     private fun prefs(context: Context) =
         context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
@@ -72,5 +73,13 @@ object Saves {
             profiles[i] = if (seat == Seat.HUMAN) id else Profiles.NONE
         }
         return true
+    }
+
+    // --- sound -------------------------------------------------------------
+
+    fun soundOn(context: Context): Boolean = prefs(context).getBoolean(KEY_SOUND, true)
+
+    fun setSoundOn(context: Context, on: Boolean) {
+        prefs(context).edit().putBoolean(KEY_SOUND, on).apply()
     }
 }

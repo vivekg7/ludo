@@ -4,12 +4,12 @@ A lightweight, fully offline Ludo game for Android. Pass-and-play with up to
 four people on one device, any seat swappable for a bot, and a profile for each
 person that keeps their wins.
 
-Requires **Android 12 (API 31)** or newer. The signed release APK is **40 KB**.
+Requires **Android 12 (API 31)** or newer. The signed release APK is **44 KB**.
 There are no runtime dependencies beyond the
 Kotlin standard library — no AndroidX, no Compose, no Material. The board and
-die are two custom `View`s drawing on a `Canvas`, the setup screen and its
-dialogs are plain platform widgets, and the app requests no
-permissions and opens no sockets.
+die are two custom `View`s drawing on a `Canvas`, the sound effects are
+synthesised in code, the setup screen and its dialogs are plain platform
+widgets, and the app requests no permissions and opens no sockets.
 
 ## Building
 
@@ -122,6 +122,35 @@ The game save format is at version 2, which adds the per-seat profile ids. A
 version 1 save, from before profiles, still resumes with its human seats as
 guests, so a game left in progress across the update is not lost.
 
+## Sound
+
+The game screen plays a rattle and a thud for each roll, a tap for every square
+a token walks, a falling slide for a capture, a chime for a token reaching
+home, a low two-note "womp" for a roll that cannot be played, and a fanfare for
+the win. The speaker button next to the turn banner mutes them, and the choice
+is remembered across games.
+
+- **No audio files.** `Sounds` renders every effect into PCM from sine tones,
+  pitch sweeps and short noise bursts when the game screen opens. The whole
+  set is about three seconds of audio: a few hundred kilobytes of memory while
+  the screen is open, but only about 3.6 KB of code in the APK, where even one
+  compressed sample would cost more than that.
+- **One static `AudioTrack` per effect**, so different effects overlap freely
+  and replaying one just rewinds it. `SoundPool` would do the mixing too, but
+  only loads from files, which would mean writing the samples to disk first.
+- **Game usage, media volume.** The tracks play as `USAGE_GAME`, so the media
+  volume controls them and they mix with music rather than interrupting it. That
+  also means the ringer's silent mode does not mute them, which is what the
+  in-game button is for.
+- **Sounds follow what the player sees, not the state.** Each plays from the
+  turn loop at the moment its animation shows it — the capture as the token
+  lands, not when `Rules.apply` removes the victim — and the fanfare plays from
+  the winning move rather than from `announceWinner`, which also runs when a
+  finished game is restored after a rotation.
+- **Silent in the background.** Bot turns are scheduled on a `Handler` that
+  keeps running after the screen is paused, so the sounds are paused with the
+  screen rather than rattling a die from an app the player has left.
+
 ## How a position is stored
 
 Every token's position is a single integer, `steps`, and nearly all of the
@@ -156,9 +185,10 @@ cannot be captured, so those tokens can never collide with anything.
 | `Bot.kt`           | One-ply heuristic opponent                                       |
 | `BoardView.kt`     | Draws the board and tokens, turns taps into token choices        |
 | `DieView.kt`       | The die, and its tumble animation                                |
+| `Sounds.kt`        | Synthesises and plays the sound effects                          |
 | `GameActivity.kt`  | The turn loop                                                    |
 | `SetupActivity.kt` | Seat picker, profile management and resume                       |
-| `Saves.kt`         | The saved game, profiles and last lineup, in SharedPreferences   |
+| `Saves.kt`         | Saved game, profiles, last lineup and mute, in SharedPreferences |
 | `Insets.kt`        | Keeps content clear of the system bars under forced edge-to-edge |
 
 `Game.kt`, `Board.kt` and `Profile.kt` touch no Android APIs, so the rules and

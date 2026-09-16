@@ -38,4 +38,6 @@
     <string name="rolled_six">Six — roll again</string>
     <string name="wins">%1$s wins!</string>
     <string name="new_game">New game</string>
+    <string name="mute">Mute sound</string>
+    <string name="unmute">Turn sound on</string>
 </resources>
