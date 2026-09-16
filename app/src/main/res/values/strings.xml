@@ -5,15 +5,29 @@
 
     <string name="seat_guest">Guest</string>
     <string name="seat_bot">Bot</string>
-    <string name="seat_off">Off</string>
+    <string name="seat_off">Empty seat</string>
     <string name="start_game">Start game</string>
-    <string name="resume_game">Resume saved game</string>
+    <string name="start_game_count">Start game · %1$d players</string>
+    <string name="resume_game">Resume game</string>
     <string name="need_two_players">Pick at least two players</string>
     <string name="seat_title">%1$s seat</string>
+    <string name="heading_saved">Saved game</string>
+    <string name="heading_new">New game</string>
+    <string name="seat_caption">%1$s · %2$s</string>
+    <string name="seat_record">won %1$d of %2$d</string>
+    <string name="seat_no_games">no games yet</string>
+    <string name="seat_guest_caption">guest, no record kept</string>
+    <string name="seat_bot_caption">played by the phone</string>
+    <string name="seat_off_caption">tap to seat someone</string>
+    <string name="saved_player">%1$s %2$d%%</string>
+    <string name="replace_save_title">Start a new game?</string>
+    <string name="replace_save_detail">The saved game will be lost: %1$s</string>
+    <string name="replace_save_confirm">Start new game</string>
 
     <string name="profiles">Profiles</string>
     <string name="no_profiles">No profiles yet. Give everyone one and each keeps their own wins.</string>
-    <string name="profile_record">%1$s · won %2$d of %3$d</string>
+    <string name="profile_record">%1$s · won %2$d of %3$d · %4$d%%</string>
+    <string name="profile_unplayed">%1$s · no games yet</string>
     <string name="new_profile">New profile…</string>
     <string name="new_profile_title">New profile</string>
     <string name="rename">Rename</string>

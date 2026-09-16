@@ -2,9 +2,7 @@ package com.crylo.ludo
 
 import android.app.Activity
 import android.app.AlertDialog
-import android.graphics.Color
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.text.InputFilter
 import android.text.InputType
@@ -20,6 +18,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 
 /**
@@ -32,11 +31,20 @@ class SetupActivity : Activity() {
 
     /** Profile id per seat; only meaningful where the seat is [Seat.HUMAN]. */
     private val seatProfiles = IntArray(Board.PLAYERS)
-    private val seatButtons = arrayOfNulls<Button>(Board.PLAYERS)
+    private val seatRows = arrayOfNulls<View>(Board.PLAYERS)
+    private val seatDots = arrayOfNulls<View>(Board.PLAYERS)
+    private val seatTitles = arrayOfNulls<TextView>(Board.PLAYERS)
+    private val seatCaptions = arrayOfNulls<TextView>(Board.PLAYERS)
 
     private var profiles = emptyList<Profile>()
 
-    private lateinit var resume: Button
+    /** The saved game, if there is one, as of the last time this screen came back. */
+    private var saved: GameState? = null
+
+    private lateinit var preview: BoardView
+    private lateinit var savedSection: View
+    private lateinit var savedSummary: TextView
+    private lateinit var startButton: Button
     private lateinit var warning: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -49,18 +57,53 @@ class SetupActivity : Activity() {
         super.onResume()
         // The saved game may have been finished or abandoned since we last
         // looked, and a finished game has changed the profiles' records.
-        resume.visibility = if (Saves.load(this) != null) View.VISIBLE else View.GONE
         profiles = Saves.profiles(this)
+        saved = Saves.load(this)
+        refreshSaved()
         refreshSeats()
     }
 
     private fun start() {
-        if (seats.count { it != Seat.NONE } < 2) {
-            warning.text = getString(R.string.need_two_players)
+        if (seats.count { it != Seat.NONE } < 2) return
+        // Starting throws the saved game away, so that is never done on one
+        // tap that sits right next to the button for getting it back.
+        val game = saved
+        if (game == null) {
+            startNewGame()
             return
         }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.replace_save_title)
+            .setMessage(getString(R.string.replace_save_detail, summaryOf(game)))
+            .setPositiveButton(R.string.replace_save_confirm) { _, _ -> startNewGame() }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun startNewGame() {
         Saves.clear(this)
         startActivity(GameActivity.newGame(this, seats, seatProfiles))
+    }
+
+    // --- saved game --------------------------------------------------------
+
+    /**
+     * Shows the saved game above the lineup, with its players and how far each
+     * has got, and makes resuming it the main action rather than starting over.
+     */
+    private fun refreshSaved() {
+        val game = saved
+        savedSection.visibility = if (game != null) View.VISIBLE else View.GONE
+        if (game != null) savedSummary.text = summaryOf(game)
+        Style.restyle(startButton, if (game != null) Style.Kind.SECONDARY else Style.Kind.PRIMARY)
+    }
+
+    /** "Vivek 34% · Jyoti 21% · Bot 1 12%", leader first. */
+    private fun summaryOf(game: GameState): String {
+        val names = Profiles.seatNames(game.seats, game.profiles, profiles) { getString(R.string.bot_name, it) }
+        return Rules.standings(game).joinToString(" · ") { player ->
+            getString(R.string.saved_player, names[player], Board.travelPercent(game.travelled(player)))
+        }
     }
 
     // --- seats -------------------------------------------------------------
@@ -68,7 +111,6 @@ class SetupActivity : Activity() {
     private fun seat(player: Int, seat: Seat, profile: Int = Profiles.NONE) {
         seats[player] = seat
         seatProfiles[player] = if (seat == Seat.HUMAN) profile else Profiles.NONE
-        warning.text = ""
         refreshSeats()
     }
 
@@ -81,16 +123,53 @@ class SetupActivity : Activity() {
         val ids = profiles.mapTo(HashSet()) { it.id }
         for (player in 0 until Board.PLAYERS) {
             if (seatProfiles[player] !in ids) seatProfiles[player] = Profiles.NONE
-            seatButtons[player]?.text = labelFor(player)
         }
+        val names = Profiles.seatNames(seats, seatProfiles, profiles) { getString(R.string.bot_name, it) }
+        for (player in 0 until Board.PLAYERS) showSeat(player, names[player])
+
+        val players = seats.count { it != Seat.NONE }
+        val ready = players >= 2
+        startButton.text = if (ready) getString(R.string.start_game_count, players) else getString(R.string.start_game)
+        Style.setEnabled(startButton, ready)
+        warning.text = if (ready) "" else getString(R.string.need_two_players)
+        warning.visibility = if (ready) View.GONE else View.VISIBLE
+
+        // A copy, so the preview's state is not changed under it by the next pick.
+        preview.showState(GameState(seats.copyOf()))
         Saves.saveLineup(this, seats, seatProfiles)
     }
 
-    private fun labelFor(player: Int): String = when (seats[player]) {
-        Seat.HUMAN -> profiles.firstOrNull { it.id == seatProfiles[player] }?.name
-            ?: getString(R.string.seat_guest)
-        Seat.BOT -> getString(R.string.seat_bot)
-        Seat.NONE -> getString(R.string.seat_off)
+    /**
+     * One seat's row: who sits there, and under it the colour and what kind of
+     * seat it is — a profile's record, a guest, a bot, or empty. An empty seat
+     * is dimmed and its dot hollow, so the players stand out at a glance.
+     */
+    private fun showSeat(player: Int, name: String) {
+        val colour = Board.names[player]
+        val profile = profiles.firstOrNull { it.id == seatProfiles[player] }
+        val title = when (seats[player]) {
+            Seat.HUMAN -> profile?.name ?: getString(R.string.seat_guest)
+            Seat.BOT -> name
+            Seat.NONE -> getString(R.string.seat_off)
+        }
+        val detail = when {
+            seats[player] == Seat.BOT -> getString(R.string.seat_bot_caption)
+            seats[player] == Seat.NONE -> getString(R.string.seat_off_caption)
+            profile == null -> getString(R.string.seat_guest_caption)
+            profile.played == 0 -> getString(R.string.seat_no_games)
+            else -> getString(R.string.seat_record, profile.wins, profile.played)
+        }
+        val taken = seats[player] != Seat.NONE
+        val caption = getString(R.string.seat_caption, colour, detail)
+
+        seatTitles[player]?.apply {
+            text = title
+            setTextColor(if (taken) Style.TEXT else Style.TEXT_DIM)
+            typeface = if (taken) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+        }
+        seatCaptions[player]?.text = caption
+        seatDots[player]?.background = Style.seatDot(this, Board.colors[player], taken)
+        seatRows[player]?.contentDescription = getString(R.string.seat_title, colour) + ": " + title + ", " + detail
     }
 
     private fun chooseSeat(player: Int) {
@@ -127,6 +206,8 @@ class SetupActivity : Activity() {
     private fun updateProfiles(updated: List<Profile>) {
         profiles = updated
         Saves.saveProfiles(this, updated)
+        // The saved game's summary names its players too.
+        refreshSaved()
         refreshSeats()
     }
 
@@ -136,6 +217,7 @@ class SetupActivity : Activity() {
         return profiles.last()
     }
 
+    /** The profiles as a leaderboard, best record first; tapping one renames or deletes it. */
     private fun manageProfiles() {
         val builder = AlertDialog.Builder(this)
             .setTitle(R.string.profiles)
@@ -149,8 +231,12 @@ class SetupActivity : Activity() {
         if (profiles.isEmpty()) {
             builder.setMessage(R.string.no_profiles)
         } else {
-            val labels = profiles.map { getString(R.string.profile_record, it.name, it.wins, it.played) }
-            builder.setItems(labels.toTypedArray()) { _, which -> editProfile(profiles[which]) }
+            val ranked = Profiles.ranked(profiles)
+            val labels = ranked.map {
+                if (it.played == 0) getString(R.string.profile_unplayed, it.name)
+                else getString(R.string.profile_record, it.name, it.wins, it.played, Profiles.winPercent(it))
+            }
+            builder.setItems(labels.toTypedArray()) { _, which -> editProfile(ranked[which]) }
         }
         builder.show()
     }
@@ -239,96 +325,163 @@ class SetupActivity : Activity() {
     private fun buildUi(): View {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(BACKGROUND)
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(28), dp(24), dp(28), dp(24))
+            setPadding(dp(20), dp(20), dp(20), dp(20))
         }
+
+        // The lineup drawn as the board it will be played on: seated colours
+        // with their tokens waiting, empty ones greyed out, as in the game.
+        preview = BoardView(this).apply {
+            bare = true
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }
+        root.addView(preview, LinearLayout.LayoutParams(dp(PREVIEW_DP), dp(PREVIEW_DP)).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+        })
 
         root.addView(TextView(this).apply {
             text = getString(R.string.app_name)
-            textSize = 40f
-            setTextColor(Color.WHITE)
+            textSize = 32f
+            setTextColor(Style.TEXT)
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
-        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(12) })
 
         root.addView(TextView(this).apply {
             text = getString(R.string.tagline)
             textSize = 14f
-            setTextColor(0xFF9AA3AF.toInt())
+            setTextColor(Style.TEXT_DIM)
             gravity = Gravity.CENTER
-        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dp(28) })
+        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dp(8) })
 
-        for (player in 0 until Board.PLAYERS) root.addView(seatRow(player))
+        savedSection = buildSavedSection()
+        root.addView(savedSection, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+
+        root.addView(Style.heading(this, getString(R.string.heading_new)), headingParams())
+        for (player in 0 until Board.PLAYERS) {
+            root.addView(seatRow(player), LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
+                bottomMargin = dp(8)
+            })
+        }
 
         warning = TextView(this).apply {
             textSize = 13f
-            setTextColor(0xFFE57373.toInt())
+            setTextColor(Style.WARNING)
             gravity = Gravity.CENTER
         }
         root.addView(warning, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
-            topMargin = dp(12)
+            topMargin = dp(4)
         })
 
-        root.addView(Button(this).apply {
-            text = getString(R.string.start_game)
+        startButton = Style.button(this, getString(R.string.start_game), Style.Kind.PRIMARY).apply {
             setOnClickListener { start() }
-        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(12) })
-
-        resume = Button(this).apply {
-            text = getString(R.string.resume_game)
-            visibility = View.GONE
-            setOnClickListener { startActivity(GameActivity.resume(this@SetupActivity)) }
         }
-        root.addView(resume, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        root.addView(startButton, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(8) })
 
-        root.addView(Button(this).apply {
-            text = getString(R.string.profiles)
+        root.addView(Style.button(this, getString(R.string.profiles), Style.Kind.QUIET).apply {
             setOnClickListener { manageProfiles() }
-        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(4) })
 
-        root.padForSystemBars()
-        return root
+        // Scrolls on a short screen or at a large font size; centred otherwise.
+        val scroll = ScrollView(this).apply {
+            setBackgroundColor(Style.BACKGROUND)
+            isFillViewport = true
+            addView(root, MATCH_PARENT, WRAP_CONTENT)
+        }
+        scroll.padForSystemBars()
+        return scroll
     }
 
+    /** The saved game, when there is one: a heading and a card that resumes it. */
+    private fun buildSavedSection(): View {
+        val section = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        section.addView(Style.heading(this, getString(R.string.heading_saved)), headingParams())
+
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            background = Style.panel(this@SetupActivity, Style.ACCENT, darkRipple = true)
+            minimumHeight = dp(64)
+            setPadding(dp(20), dp(12), dp(20), dp(12))
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { startActivity(GameActivity.resume(this@SetupActivity)) }
+        }
+        card.addView(TextView(this).apply {
+            text = getString(R.string.resume_game)
+            textSize = 17f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Style.ON_ACCENT)
+            gravity = Gravity.CENTER
+        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        savedSummary = TextView(this).apply {
+            textSize = 13f
+            setTextColor(Style.ON_ACCENT)
+            alpha = 0.8f
+            gravity = Gravity.CENTER
+            maxLines = 2
+            ellipsize = TextUtils.TruncateAt.END
+        }
+        card.addView(savedSummary, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        section.addView(card, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        return section
+    }
+
+    /** A whole-width row per seat; tapping anywhere on it picks who sits there. */
     private fun seatRow(player: Int): View {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(6), 0, dp(6))
-        }
-
-        row.addView(View(this).apply {
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(Board.colors[player])
-            }
-        }, LinearLayout.LayoutParams(dp(22), dp(22)))
-
-        row.addView(TextView(this).apply {
-            text = Board.names[player]
-            textSize = 17f
-            setTextColor(Color.WHITE)
-        }, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f).apply { leftMargin = dp(14) })
-
-        val button = Button(this).apply {
-            text = labelFor(player)
-            // Names keep the case they were typed in.
-            isAllCaps = false
-            maxLines = 1
-            ellipsize = TextUtils.TruncateAt.END
-            minWidth = dp(140)
+            background = Style.panel(this@SetupActivity, Style.SURFACE)
+            minimumHeight = dp(64)
+            setPadding(dp(16), dp(10), dp(12), dp(10))
+            isClickable = true
+            isFocusable = true
             setOnClickListener { chooseSeat(player) }
         }
-        seatButtons[player] = button
-        row.addView(button, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT))
 
+        val dot = View(this)
+        row.addView(dot, LinearLayout.LayoutParams(dp(22), dp(22)))
+
+        val text = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val title = TextView(this).apply {
+            textSize = 17f
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+        }
+        val caption = TextView(this).apply {
+            textSize = 13f
+            setTextColor(Style.TEXT_DIM)
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+        }
+        text.addView(title)
+        text.addView(caption)
+        row.addView(text, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f).apply { leftMargin = dp(16) })
+
+        row.addView(TextView(this).apply {
+            this.text = "\u203A" // ›
+            textSize = 26f
+            setTextColor(Style.TEXT_FAINT)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { leftMargin = dp(8) })
+
+        seatRows[player] = row
+        seatDots[player] = dot
+        seatTitles[player] = title
+        seatCaptions[player] = caption
         return row
     }
 
-    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
+    private fun headingParams() = LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
+        topMargin = dp(20)
+        bottomMargin = dp(8)
+        leftMargin = dp(4)
+    }
+
+    private fun dp(value: Int) = Style.dp(this, value)
 
     private companion object {
-        const val BACKGROUND = 0xFF12161C.toInt()
+        const val PREVIEW_DP = 132
     }
 }

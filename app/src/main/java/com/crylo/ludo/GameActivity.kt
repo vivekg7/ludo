@@ -47,7 +47,7 @@ class GameActivity : Activity() {
      * What the banner and the board call each seat: its profile's name, "Bot"
      * and a number for a bot, or its colour for a guest.
      */
-    private val names = Board.names.copyOf()
+    private lateinit var names: Array<String>
 
     private val handler = Handler(Looper.getMainLooper())
     private val random = Random.Default
@@ -66,14 +66,9 @@ class GameActivity : Activity() {
             ?: (if (intent.getBooleanExtra(EXTRA_RESUME, false)) Saves.load(this) else null)
             ?: newStateFromIntent()
 
-        val profiles = Saves.profiles(this).associateBy { it.id }
-        var bots = 0
-        for (player in 0 until Board.PLAYERS) {
-            // Bots are numbered in seat order, so two of them can be told apart.
-            if (state.isBot(player)) names[player] = getString(R.string.bot_name, ++bots)
-            // A profile deleted while its game was saved just falls back to the colour.
-            profiles[state.profiles[player]]?.let { names[player] = it.name }
-        }
+        // Bots are numbered in seat order, so two of them can be told apart; a
+        // profile deleted while its game was saved just falls back to the colour.
+        names = Profiles.seatNames(state.seats, state.profiles, Saves.profiles(this)) { getString(R.string.bot_name, it) }
 
         sounds = Sounds()
         sounds.enabled = Saves.soundOn(this)

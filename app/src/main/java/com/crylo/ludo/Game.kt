@@ -40,6 +40,18 @@ class GameState(val seats: Array<Seat>) {
 
     fun isBot(player: Int) = seats[player] == Seat.BOT
 
+    /** Steps [player]'s four tokens have walked between them, out of 4 × [Board.FINISH]. */
+    fun travelled(player: Int): Int {
+        val first = Board.firstToken(player)
+        return (first until first + Board.TOKENS_PER_PLAYER).sumOf { steps[it] }
+    }
+
+    /** How many of [player]'s tokens are on the centre square. */
+    fun tokensHome(player: Int): Int {
+        val first = Board.firstToken(player)
+        return (first until first + Board.TOKENS_PER_PLAYER).count { steps[it] == Board.FINISH }
+    }
+
     fun encode(): String = buildString {
         append(SAVE_VERSION).append('|')
         seats.joinTo(this, ",") { it.ordinal.toString() }
@@ -194,6 +206,20 @@ object Rules {
         val occupied = state.seats.indices.filter { state.seats[it] != Seat.NONE }
         state.current = occupied[random.nextInt(occupied.size)]
     }
+
+    /**
+     * Occupied seats in finishing order: the winner, if there is one, then the
+     * rest by tokens home and then by ground covered. Seat order breaks a tie.
+     */
+    fun standings(state: GameState): IntArray =
+        (0 until Board.PLAYERS)
+            .filter { state.seats[it] != Seat.NONE }
+            .sortedWith(
+                compareByDescending<Int> { it == state.winner }
+                    .thenByDescending { state.tokensHome(it) }
+                    .thenByDescending { state.travelled(it) },
+            )
+            .toIntArray()
 
     /** Next occupied seat clockwise. */
     fun nextPlayer(state: GameState): Int {

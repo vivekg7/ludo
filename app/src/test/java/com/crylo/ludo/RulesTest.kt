@@ -262,6 +262,19 @@ class RulesTest {
         assertEquals(0, starts[2])
         assertTrue("both seats get to start: ${starts.toList()}", starts[1] > 400 && starts[3] > 400)
     }
+
+    @Test
+    fun `standings put the winner first, then tokens home, then ground covered`() {
+        val state = game(Seat.HUMAN, Seat.BOT, Seat.NONE, Seat.HUMAN)
+        state.steps[Board.firstToken(0)] = 40                          // red: far, none home
+        state.steps[Board.firstToken(1)] = Board.FINISH                // green: one home
+        state.steps[Board.firstToken(3)] = 40                          // blue: level with red
+        assertArrayEquals(intArrayOf(1, 0, 3), Rules.standings(state))
+
+        for (t in 0 until Board.TOKENS_PER_PLAYER) state.steps[Board.firstToken(3) + t] = Board.FINISH
+        state.winner = 3
+        assertArrayEquals(intArrayOf(3, 1, 0), Rules.standings(state))
+    }
 }
 
 class SaveTest {
@@ -400,5 +413,24 @@ class ProfileTest {
     fun `rename and delete touch only their profile`() {
         assertEquals(listOf("Mum", "Papa", "Asha"), Profiles.rename(family, 2, "Papa").map { it.name })
         assertEquals(listOf(1, 3), Profiles.delete(family, 2).map { it.id })
+    }
+
+    @Test
+    fun `ranking is by wins, then fewer games, then name`() {
+        val profiles = family + Profile(4, "bina", 1, 1) + Profile(5, "Zoya", 9, 2)
+        assertEquals(listOf("Mum", "Zoya", "Asha", "bina", "Dad"), Profiles.ranked(profiles).map { it.name })
+        assertEquals(40, Profiles.winPercent(family[0]))
+        assertEquals(0, Profiles.winPercent(family[1]))
+        assertEquals(66, Profiles.winPercent(Profile(9, "Ravi", 3, 2)))
+    }
+
+    @Test
+    fun `seats are named by profile, numbered bot, or colour`() {
+        val seats = arrayOf(Seat.BOT, Seat.HUMAN, Seat.HUMAN, Seat.BOT)
+        val ids = intArrayOf(0, 3, 99, 0)                               // 99: a deleted profile
+        assertArrayEquals(
+            arrayOf("Bot 1", "Asha", "Yellow", "Bot 2"),
+            Profiles.seatNames(seats, ids, family) { "Bot $it" },
+        )
     }
 }

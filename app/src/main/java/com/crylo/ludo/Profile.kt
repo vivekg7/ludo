@@ -60,6 +60,44 @@ object Profiles {
         }
     }
 
+    /**
+     * Best record first: most wins, then fewest games taken to win them, then
+     * by name. Ranked by wins rather than win rate, so one lucky first game
+     * does not put a newcomer above someone who has won ten.
+     */
+    fun ranked(profiles: List<Profile>): List<Profile> =
+        profiles.sortedWith(
+            compareByDescending<Profile> { it.wins }
+                .thenBy { it.played }
+                .thenBy(String.CASE_INSENSITIVE_ORDER) { it.name },
+        )
+
+    /** Share of games won, rounded down so 100 means never lost. */
+    fun winPercent(profile: Profile): Int = if (profile.played == 0) 0 else profile.wins * 100 / profile.played
+
+    /**
+     * What each seat is called on screen: its profile's name, "Bot 1", "Bot 2"
+     * and so on for bots in seat order, or its colour for a guest, an empty
+     * seat, or a profile that has since been deleted. Shared by the game screen
+     * and the setup screen so the two never disagree about who is who.
+     */
+    fun seatNames(
+        seats: Array<Seat>,
+        seatProfiles: IntArray,
+        profiles: List<Profile>,
+        botName: (Int) -> String,
+    ): Array<String> {
+        val byId = profiles.associateBy { it.id }
+        var bots = 0
+        return Array(Board.PLAYERS) { player ->
+            when (seats[player]) {
+                Seat.BOT -> botName(++bots)
+                Seat.HUMAN -> byId[seatProfiles[player]]?.name ?: Board.names[player]
+                Seat.NONE -> Board.names[player]
+            }
+        }
+    }
+
     /** One profile per line, name last so it may contain the separator. */
     fun encode(profiles: List<Profile>): String =
         profiles.joinToString("\n") { "${it.id},${it.played},${it.wins},${it.name}" }

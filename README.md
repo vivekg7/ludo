@@ -4,7 +4,7 @@ A lightweight, fully offline Ludo game for Android. Pass-and-play with up to
 four people on one device, any seat swappable for a bot, and a profile for each
 person that keeps their wins.
 
-Requires **Android 12 (API 31)** or newer. The signed release APK is **47 KB**.
+Requires **Android 12 (API 31)** or newer. The signed release APK is **52 KB**.
 There are no runtime dependencies beyond the
 Kotlin standard library — no AndroidX, no Compose, no Material. The board and
 die are two custom `View`s drawing on a `Canvas`, the sound effects are
@@ -94,13 +94,42 @@ The variant here is the one most people play:
 
 Tokens of the same colour may stack on one square. There is no blocking rule.
 
+## Setup screen
+
+The first screen shows the lineup for a new game and, when there is one, the
+saved game.
+
+- **A saved game comes first.** It is an amber card above the lineup, listing
+  its players leader first with how far each has got — "Vivek 34% · Jyoti 21%" —
+  and tapping it resumes. While it exists, Start is drawn as the secondary
+  button.
+- **Starting over asks first.** Starting a new game deletes the save, and Start
+  sits right below the card that resumes it, so a save is never lost to one
+  tap: Start asks to confirm and names the game it would replace.
+- **Each seat is a whole-width row.** Tapping anywhere on it picks who sits
+  there. The row shows who is seated, with the colour and the kind of seat
+  underneath: a profile's record ("won 4 of 9"), a guest, a bot, or empty. An
+  empty seat is dimmed and its dot is a ring, so the players stand out at a
+  glance. Bots are numbered "Bot 1", "Bot 2" as they are in the game;
+  `Profiles.seatNames` names seats for both screens so they cannot disagree.
+- **Start counts the players** — "Start game · 3 players" — and is disabled,
+  with the reason shown under the rows, until there are at least two.
+- **The board above is the lineup**, drawn by `BoardView` in its `bare` mode
+  (no name strips, no progress): seated colours with their tokens in the yard,
+  empty ones greyed out as they will be in the game.
+- The screen scrolls when it does not fit, on a short phone or at a large font
+  size, and is centred otherwise.
+
 ## Profiles
 
 Each seat is a profile, a guest, a bot, or empty. A profile is a name and a
 record — games played and games won — kept on the device. The Profiles button
-on the setup screen lists everyone's record and renames or deletes them; a new
-profile can also be made straight from a seat.
+on the setup screen lists everyone's record, best first, and renames or deletes
+them; a new profile can also be made straight from a seat.
 
+- **Records are ranked by wins**, then by fewer games taken to win them, then by
+  name, and each shows its win rate. Wins come before win rate so that someone
+  who won their one and only game does not rank above someone who has won ten.
 - **Only a finished game counts.** When a game is won, every seated profile
   gets a game played and the winner's gets a win. An abandoned game changes
   nothing, so quitting a losing game is not recorded as a loss — and a finished
@@ -248,9 +277,10 @@ cannot be captured, so those tokens can never collide with anything.
 | `Bot.kt`           | One-ply heuristic opponent                                       |
 | `BoardView.kt`     | Draws the board, tokens and seat names; turns taps into choices  |
 | `DieView.kt`       | The die, and its tumble animation                                |
+| `Style.kt`         | Colours, buttons and panels shared by both screens               |
 | `Sounds.kt`        | Synthesises and plays the sound effects                          |
 | `GameActivity.kt`  | The turn loop                                                    |
-| `SetupActivity.kt` | Seat picker, profile management and resume                       |
+| `SetupActivity.kt` | Seat picker, profile leaderboard and resume                      |
 | `Saves.kt`         | Saved game, profiles, lineup, mute and name facing (preferences) |
 | `Insets.kt`        | Keeps content clear of the system bars under forced edge-to-edge |
 
