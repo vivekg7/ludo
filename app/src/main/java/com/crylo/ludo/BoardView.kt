@@ -272,7 +272,7 @@ class BoardView(context: Context) : View(context) {
         drawPaper(canvas)
         drawYards(canvas)
         drawRing(canvas)
-        drawHomeArrows(canvas)
+        drawArrows(canvas)
         drawHomeRuns(canvas)
         drawCentre(canvas)
         drawTokens(canvas, game)
@@ -427,23 +427,30 @@ class BoardView(context: Context) : View(context) {
 
     /**
      * An arrow in each player's colour on the last ring square before its home
-     * run, pointing the way in, so it is clear where a token turns off.
+     * run, pointing the way in, so it is clear where a token turns off; and a
+     * dark one on each start square, pointing the way tokens travel.
      */
-    private fun drawHomeArrows(canvas: Canvas) {
+    private fun drawArrows(canvas: Canvas) {
         for (player in 0 until Board.PLAYERS) {
             val turnOff = Board.ring[Board.ringIndex(player, Board.LAST_RING_STEP)]
-            val entry = Board.homeRun[player][0]
-            val dx = (Board.colOf(entry) - Board.colOf(turnOff)).toFloat()
-            val dy = (Board.rowOf(entry) - Board.rowOf(turnOff)).toFloat()
+            drawArrow(canvas, turnOff, Board.homeRun[player][0], Board.colors[player], 1f)
 
-            canvas.save()
-            canvas.translate((Board.colOf(turnOff) + 0.5f) * cell, (Board.rowOf(turnOff) + 0.5f) * cell)
-            canvas.rotate(Math.toDegrees(atan2(dy, dx).toDouble()).toFloat())
-            canvas.scale(cell, cell)
-            fill.color = Board.colors[player]
-            canvas.drawPath(arrow, fill)
-            canvas.restore()
+            val start = Board.ring[Board.start[player]]
+            drawArrow(canvas, start, Board.ring[(Board.start[player] + 1) % Board.RING_CELLS], START_ARROW, 0.8f)
         }
+    }
+
+    /** An arrow on the square [from], pointing at the neighbouring square [toward]. */
+    private fun drawArrow(canvas: Canvas, from: Int, toward: Int, color: Int, size: Float) {
+        val dx = (Board.colOf(toward) - Board.colOf(from)).toFloat()
+        val dy = (Board.rowOf(toward) - Board.rowOf(from)).toFloat()
+        canvas.save()
+        canvas.translate((Board.colOf(from) + 0.5f) * cell, (Board.rowOf(from) + 0.5f) * cell)
+        canvas.rotate(Math.toDegrees(atan2(dy, dx).toDouble()).toFloat())
+        canvas.scale(cell * size, cell * size)
+        fill.color = color
+        canvas.drawPath(arrow, fill)
+        canvas.restore()
     }
 
     private fun drawHomeRuns(canvas: Canvas) {
@@ -742,6 +749,7 @@ class BoardView(context: Context) : View(context) {
         const val NAME_IDLE = 0xFF9AA3AF.toInt()
         const val PROGRESS_IDLE = 0xFF6B7380.toInt()
         const val PROGRESS_CURRENT = 0xFFC9CFD6.toInt()
+        const val START_ARROW = 0x70000000
 
         /** [top] laid over [bottom] at the given opacity, both fully opaque. */
         fun blend(top: Int, bottom: Int, amount: Float): Int {

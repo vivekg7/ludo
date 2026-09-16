@@ -152,7 +152,9 @@ home, rounded down so 100% only ever means the game is won.
 - **Yards have a pocket per token**, so a yard whose tokens are out reads as
   waiting for them, not as blank.
 - **An arrow in each colour** sits on the last ring square before that colour's
-  home run, pointing in, to show where its tokens turn off the ring.
+  home run, pointing in, to show where its tokens turn off the ring, and a dark
+  arrow on each start square shows which way tokens travel. The start arrows are
+  translucent black rather than white, which vanished on yellow.
 - **The die carries the current player's colour as a thick border**, and before
   it is rolled shows a lightning bolt instead of a blank face, so it reads as
   something to tap.
