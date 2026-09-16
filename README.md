@@ -4,7 +4,7 @@ A lightweight, fully offline Ludo game for Android. Pass-and-play with up to
 four people on one device, any seat swappable for a bot, and a profile for each
 person that keeps their wins.
 
-Requires **Android 12 (API 31)** or newer. The signed release APK is **44 KB**.
+Requires **Android 12 (API 31)** or newer. The signed release APK is **47 KB**.
 There are no runtime dependencies beyond the
 Kotlin standard library — no AndroidX, no Compose, no Material. The board and
 die are two custom `View`s drawing on a `Canvas`, the sound effects are
@@ -167,8 +167,13 @@ home, rounded down so 100% only ever means the game is won.
 - **A captured token walks home backwards along its own path**, square by
   square, instead of jumping to its yard, so everyone sees what happened and how
   much ground it lost. Every captured token arrives home together, in 0.3–1 s
-  depending on how far the farthest had come. The capture sound fires as the
-  capturing token lands; the turn carries on once the captured tokens are home.
+  depending on how far the farthest had come. The capture sound and a vibration
+  fire as the capturing token lands; the turn carries on once the captured
+  tokens are home.
+- **The phone vibrates** on a person's six, on any capture, and three times on a
+  win. It uses `View.performHapticFeedback`, which needs no permission and
+  follows the system's touch-feedback setting, so it is off for anyone who has
+  turned that off. Sixes a bot rolls do not vibrate, since nobody rolled them.
 
 ## Sound
 

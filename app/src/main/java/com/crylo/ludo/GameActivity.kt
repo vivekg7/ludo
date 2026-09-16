@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
@@ -84,7 +85,10 @@ class GameActivity : Activity() {
 
         board.onTokenPicked = { token -> play(token) }
         board.onSquareReached = { sounds.play(Sound.STEP) }
-        board.onCapture = { sounds.play(Sound.CAPTURE) }
+        board.onCapture = {
+            sounds.play(Sound.CAPTURE)
+            buzz(HapticFeedbackConstants.LONG_PRESS)
+        }
         die.onRollRequested = { roll() }
 
         beginTurn()
@@ -144,6 +148,7 @@ class GameActivity : Activity() {
         sounds.play(Sound.ROLL)
         die.roll(face) {
             sounds.play(Sound.LAND)
+            if (face == 6 && !state.isBot(state.current)) buzz(HapticFeedbackConstants.CONFIRM)
             state.die = face
             state.sixStreak = if (face == 6) state.sixStreak + 1 else 0
             resolveRoll(face)
@@ -214,6 +219,10 @@ class GameActivity : Activity() {
         if (state.winner >= 0) {
             sounds.play(Sound.WIN)
             announceWinner()
+            // After announceWinner, which clears the handler these are queued on.
+            for (i in 0 until WIN_BUZZES) {
+                handler.postDelayed({ buzz(HapticFeedbackConstants.CONFIRM) }, i * WIN_BUZZ_GAP_MS)
+            }
             return
         }
 
@@ -265,6 +274,14 @@ class GameActivity : Activity() {
         hint.text = ""
         newGame.visibility = View.VISIBLE
         Saves.clear(this)
+    }
+
+    /**
+     * A short vibration through the view, which needs no permission and is
+     * skipped by the system when the player has touch feedback turned off.
+     */
+    private fun buzz(kind: Int) {
+        board.performHapticFeedback(kind)
     }
 
     // --- lifecycle ---------------------------------------------------------
@@ -400,6 +417,9 @@ class GameActivity : Activity() {
         private const val HAND_OVER_MS = 750L
 
         private const val TOGGLE_DP = 48
+
+        private const val WIN_BUZZES = 3
+        private const val WIN_BUZZ_GAP_MS = 180L
 
         private const val BACKGROUND = 0xFF12161C.toInt()
         private const val ACCENT = 0xFFFFB300.toInt()
