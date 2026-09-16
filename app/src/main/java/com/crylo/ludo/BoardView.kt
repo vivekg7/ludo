@@ -39,6 +39,9 @@ class BoardView(context: Context) : View(context) {
     /** Called each time a sliding token reaches the next square on its way. */
     var onSquareReached: (() -> Unit)? = null
 
+    /** Called as a capturing token lands, when its victims start back home. */
+    var onCapture: (() -> Unit)? = null
+
     /** What each seat is called, in seat order. */
     var names: Array<String> = Board.names
         set(value) {
@@ -95,12 +98,14 @@ class BoardView(context: Context) : View(context) {
     // A token sliding along its path. -1 when nothing is moving.
     private var movingToken = -1
     private var movingAt = 0f
-    private var movingTo = 0
     private var mover: ValueAnimator? = null
 
-    // Tokens held at their pre-capture square until the capturing token lands.
+    // Captured tokens, held at the square they were taken on until the
+    // capturing token lands, then walked back along their own path home.
     private var frozenTokens = IntArray(0)
     private var frozenSteps = IntArray(0)
+    private var returned = 0f
+    private var returner: ValueAnimator? = null
 
     private var pulse = 0f
     private var pulser: ValueAnimator? = null
@@ -126,7 +131,8 @@ class BoardView(context: Context) : View(context) {
     /**
      * Slides [token] from one position to another, one board square at a time
      * so it visibly walks the corners of the path rather than cutting across.
-     * Captured tokens stay put until the move lands, then snap to their yard.
+     * Captured tokens stay put until the move lands, then walk backwards along
+     * the way they came to their yard; [onEnd] runs once they are home.
      */
     fun animateMove(
         token: Int,
@@ -137,10 +143,11 @@ class BoardView(context: Context) : View(context) {
         onEnd: () -> Unit,
     ) {
         mover?.cancel()
+        returner?.cancel()
         movingToken = token
-        movingTo = to
         frozenTokens = captured
         frozenSteps = capturedFrom
+        returned = 0f
 
         val squares = (to - from).coerceAtLeast(1)
         var reached = from
@@ -157,8 +164,32 @@ class BoardView(context: Context) : View(context) {
             }
             doOnEnd {
                 movingToken = -1
+                if (frozenTokens.isEmpty()) {
+                    invalidate()
+                    onEnd()
+                } else {
+                    onCapture?.invoke()
+                    sendHome(onEnd)
+                }
+            }
+            start()
+        }
+    }
+
+    /** Walks the captured tokens back down their own path, all arriving together. */
+    private fun sendHome(onEnd: () -> Unit) {
+        val farthest = frozenSteps.max()
+        returner = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = (farthest * MS_PER_RETURN_SQUARE).coerceIn(MIN_RETURN_MS, MAX_RETURN_MS)
+            interpolator = AccelerateDecelerateInterpolator()
+            addUpdateListener {
+                returned = it.animatedValue as Float
+                invalidate()
+            }
+            doOnEnd {
                 frozenTokens = IntArray(0)
                 frozenSteps = IntArray(0)
+                returned = 0f
                 invalidate()
                 onEnd()
             }
@@ -169,7 +200,11 @@ class BoardView(context: Context) : View(context) {
     fun cancelAnimations() {
         mover?.cancel()
         mover = null
+        returner?.cancel()
+        returner = null
         movingToken = -1
+        frozenTokens = IntArray(0)
+        frozenSteps = IntArray(0)
         stopPulse()
     }
 
@@ -369,20 +404,15 @@ class BoardView(context: Context) : View(context) {
         for (token in 0 until Board.TOKENS) {
             val player = Board.owner(token)
             val slot = token % Board.TOKENS_PER_PLAYER
-            val steps = stepsShownFor(token, game)
+            val at = shownAt(token, game)
 
-            if (token == movingToken) {
-                val low = floor(movingAt).toInt()
-                val frac = movingAt - low
-                Board.locate(player, low, slot, here)
-                Board.locate(player, min(low + 1, movingTo), slot, there)
-                xs[token] = (here[0] + (there[0] - here[0]) * frac) * cell
-                ys[token] = (here[1] + (there[1] - here[1]) * frac) * cell
-            } else {
-                Board.locate(player, steps, slot, here)
-                xs[token] = here[0] * cell
-                ys[token] = here[1] * cell
-            }
+            // Part way between two squares, as a moving or returning token is.
+            val low = floor(at).toInt()
+            val frac = at - low
+            Board.locate(player, low, slot, here)
+            if (frac > 0f) Board.locate(player, low + 1, slot, there)
+            xs[token] = (here[0] + (there[0] - here[0]) * frac) * cell
+            ys[token] = (here[1] + (there[1] - here[1]) * frac) * cell
         }
 
         for (token in 0 until Board.TOKENS) {
@@ -400,16 +430,19 @@ class BoardView(context: Context) : View(context) {
         }
     }
 
-    private fun stepsShownFor(token: Int, game: GameState): Int {
+    /** Where a token is drawn, in steps: fractional while it moves or returns. */
+    private fun shownAt(token: Int, game: GameState): Float {
+        if (token == movingToken) return movingAt
         val frozen = frozenTokens.indexOf(token)
-        return if (frozen >= 0) frozenSteps[frozen] else game.steps[token]
+        return if (frozen >= 0) frozenSteps[frozen] * (1f - returned) else game.steps[token].toFloat()
     }
 
     private fun drawTokens(canvas: Canvas, game: GameState) {
-        // Draw the moving token last so it passes over the others.
+        // Draw moving and returning tokens last so they pass over the others.
         for (pass in 0..1) {
             for (token in 0 until Board.TOKENS) {
-                if ((token == movingToken) != (pass == 1)) continue
+                val travelling = token == movingToken || (returned > 0f && token in frozenTokens)
+                if (travelling != (pass == 1)) continue
                 val player = Board.owner(token)
                 if (game.seats[player] == Seat.NONE) continue
                 drawToken(canvas, token, player)
@@ -539,6 +572,10 @@ class BoardView(context: Context) : View(context) {
         const val MS_PER_SQUARE = 95L
         const val MIN_MOVE_MS = 180L
         const val MAX_MOVE_MS = 700L
+
+        const val MS_PER_RETURN_SQUARE = 22L
+        const val MIN_RETURN_MS = 320L
+        const val MAX_RETURN_MS = 1000L
 
         /** Height of each name strip, in cells. */
         const val LABEL_CELLS = 2f

@@ -81,6 +81,7 @@ class GameActivity : Activity() {
 
         board.onTokenPicked = { token -> play(token) }
         board.onSquareReached = { sounds.play(Sound.STEP) }
+        board.onCapture = { sounds.play(Sound.CAPTURE) }
         die.onRollRequested = { roll() }
 
         beginTurn()
@@ -213,10 +214,9 @@ class GameActivity : Activity() {
             return
         }
 
-        when {
-            move.captured.isNotEmpty() -> sounds.play(Sound.CAPTURE)
-            move.finished -> sounds.play(Sound.HOME)
-        }
+        // A capture has already sounded through board.onCapture, as its token
+        // landed; this runs once the captured tokens are back in their yard.
+        if (move.finished) sounds.play(Sound.HOME)
 
         hint.text = when {
             move.captured.isNotEmpty() -> getString(R.string.captured)

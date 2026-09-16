@@ -146,6 +146,11 @@ can be told apart; the turn banner uses the same names.
 - **The die carries the current player's colour as a thick border**, and before
   it is rolled shows a lightning bolt instead of a blank face, so it reads as
   something to tap.
+- **A captured token walks home backwards along its own path**, square by
+  square, instead of jumping to its yard, so everyone sees what happened and how
+  much ground it lost. Every captured token arrives home together, in 0.3–1 s
+  depending on how far the farthest had come. The capture sound fires as the
+  capturing token lands; the turn carries on once the captured tokens are home.
 
 ## Sound
 
