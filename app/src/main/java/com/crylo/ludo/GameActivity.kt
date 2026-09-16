@@ -24,6 +24,11 @@ import kotlin.random.Random
  * Every transition goes through [beginTurn], which reads the current state and
  * decides what should happen next. That means a game restored from disk
  * mid-turn resumes exactly where it left off, with no separate resume path.
+ *
+ * For that to hold, [state] must never be ahead of or behind the rules while
+ * the screen catches up. A move and the turn it settles are both written to
+ * [state] the moment they happen; the animations and pauses that follow only
+ * show them, so a save taken during one restores to what comes next.
  */
 class GameActivity : Activity() {
 
@@ -159,6 +164,14 @@ class GameActivity : Activity() {
         val face = state.die
         val before = state.steps.copyOf()
         val move = Rules.apply(state, token, face)
+        // Settled before the token starts to slide: were the die left set, a
+        // game saved mid-animation would restore with the token already moved
+        // and the same roll still to play.
+        Rules.settle(state, move)
+        // Credited here, the one place a win happens, rather than once the
+        // animation ends, when an activity closed mid-slide would never get
+        // to it; a restored finished game only announces, so none counts twice.
+        if (state.winner >= 0) Saves.saveProfiles(this, Profiles.recordGame(Saves.profiles(this), state))
         // Captured tokens are drawn where they stood until the move lands.
         val capturedFrom = IntArray(move.captured.size) { before[move.captured[it]] }
 
@@ -170,9 +183,6 @@ class GameActivity : Activity() {
 
     private fun afterMove(move: Move) {
         if (state.winner >= 0) {
-            // Credited here, where the win happens, and not in announceWinner,
-            // which beginTurn can also reach, so a game can never count twice.
-            Saves.saveProfiles(this, Profiles.recordGame(Saves.profiles(this), state))
             announceWinner()
             return
         }
@@ -185,22 +195,27 @@ class GameActivity : Activity() {
         }
 
         if (move.extraTurn) {
-            state.die = 0
             busy = false
             beginTurn()
         } else {
-            handOver()
+            // play() has already passed the dice.
+            pauseThenBeginTurn()
         }
     }
 
-    /** Pauses a beat so the player can read the outcome, then passes the dice. */
+    /** Passes the dice on a roll that cannot be played. */
     private fun handOver() {
+        // Passed now rather than after the pause, so a game saved during the
+        // pause belongs to the next player instead of handing this one a
+        // fresh roll.
+        Rules.passTurn(state)
+        pauseThenBeginTurn()
+    }
+
+    /** Pauses a beat so the player can read the outcome before the next turn. */
+    private fun pauseThenBeginTurn() {
         busy = true
-        // Cleared now rather than in the callback so a game saved during the
-        // pause cannot be restored into a free extra roll.
-        state.die = 0
         handler.postDelayed({
-            Rules.passTurn(state)
             busy = false
             beginTurn()
         }, HAND_OVER_MS)

@@ -185,6 +185,16 @@ object Rules {
         return p
     }
 
+    /**
+     * Finishes the turn a move from [apply] leaves open: the same player rolls
+     * again after an extra turn, otherwise the dice pass on. A won game is
+     * left as it is.
+     */
+    fun settle(state: GameState, move: Move) {
+        if (state.winner >= 0) return
+        if (move.extraTurn) state.die = 0 else passTurn(state)
+    }
+
     /** Hands the dice on and clears the per-turn state. */
     fun passTurn(state: GameState) {
         state.current = nextPlayer(state)

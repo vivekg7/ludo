@@ -179,6 +179,39 @@ class RulesTest {
     }
 
     @Test
+    fun `a settled move leaves no roll behind to be played twice`() {
+        val state = soloVsGreen()
+        state.steps[0] = 10
+        state.die = 3
+        Rules.settle(state, Rules.apply(state, 0, 3))
+        assertEquals(1, state.current)
+        assertEquals(0, state.die)
+    }
+
+    @Test
+    fun `an extra turn settles to the same player rolling again, streak kept`() {
+        val state = soloVsGreen()
+        state.die = 6
+        state.sixStreak = 1
+        Rules.settle(state, Rules.apply(state, 0, 6))
+        assertEquals(0, state.current)
+        assertEquals(0, state.die)
+        assertEquals(1, state.sixStreak)
+    }
+
+    @Test
+    fun `a won game is left as it is`() {
+        val state = soloVsGreen()
+        for (t in 0 until 3) state.steps[t] = Board.FINISH
+        state.steps[3] = Board.FINISH - 2
+        state.die = 2
+        Rules.settle(state, Rules.apply(state, 3, 2))
+        assertEquals(0, state.winner)
+        assertEquals(0, state.current)
+        assertEquals(2, state.die)
+    }
+
+    @Test
     fun `passing the dice skips empty seats`() {
         val state = game(Seat.HUMAN, Seat.NONE, Seat.BOT, Seat.NONE)
         state.current = 0

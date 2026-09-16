@@ -102,8 +102,9 @@ profile can also be made straight from a seat.
 - **Only a finished game counts.** When a game is won, every seated profile
   gets a game played and the winner's gets a win. An abandoned game changes
   nothing, so quitting a losing game is not recorded as a loss — and a finished
-  game is credited in exactly one place, `GameActivity.afterMove`, so it cannot
-  count twice.
+  game is credited in exactly one place, `GameActivity.play`, the moment the
+  winning move is applied, so it cannot count twice or be lost to the app
+  closing mid-animation.
 - **Bots and guests have no record.** A guest seat is for a visitor who does
   not need one.
 - **Seats hold a profile id, not a name.** Renaming someone mid-game relabels
@@ -168,6 +169,13 @@ Every transition in `GameActivity` goes through `beginTurn()`, which reads the
 state and decides what happens next. A game restored from disk mid-turn — even
 with the dice already rolled — resumes through the same path, so there is no
 separate restore logic to keep in sync.
+
+That only works if the state is never mid-way through anything. The token
+slide and the pause before the next player are purely visual: a move, and the
+turn it settles (`Rules.settle` — the same player rolls again, or the dice pass
+on), are written to the state the instant the move is chosen. Leaving the roll
+in place until the animation finished would let a game saved during it restore
+with the token already moved and the same roll still to play.
 
 ## License
 
