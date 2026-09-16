@@ -146,6 +146,11 @@ can be told apart; the turn banner uses the same names.
 - **The die carries the current player's colour as a thick border**, and before
   it is rolled shows a lightning bolt instead of a blank face, so it reads as
   something to tap.
+- **Picking a token previews where each one lands**: a dot on the square, or a
+  crosshair round the token that move would capture. Tapping the dot or
+  crosshair plays that token, which saves hunting for the right one in a stack.
+  The preview asks `Rules.victims`, the same function `Rules.apply` captures
+  with, so it cannot promise a capture the rules then refuse.
 - **A captured token walks home backwards along its own path**, square by
   square, instead of jumping to its yard, so everyone sees what happened and how
   much ground it lost. Every captured token arrives home together, in 0.3–1 s

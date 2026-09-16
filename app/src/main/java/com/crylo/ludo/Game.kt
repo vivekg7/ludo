@@ -108,7 +108,7 @@ object Rules {
 
     const val SIX_STREAK_LIMIT = 3
 
-    private val NO_MOVES = IntArray(0)
+    private val EMPTY = IntArray(0)
 
     /** Where `steps` would land with this roll, or -1 if the move is illegal. */
     fun targetOf(steps: Int, die: Int): Int = when {
@@ -121,7 +121,7 @@ object Rules {
 
     /** Tokens of the player to move that can legally use this roll. */
     fun legalMoves(state: GameState, die: Int): IntArray {
-        if (die !in 1..6 || state.winner >= 0) return NO_MOVES
+        if (die !in 1..6 || state.winner >= 0) return EMPTY
         val first = Board.firstToken(state.current)
         var count = 0
         val buffer = IntArray(Board.TOKENS_PER_PLAYER)
@@ -138,20 +138,9 @@ object Rules {
         val to = targetOf(from, die)
         require(to > 0) { "illegal move: token $token at $from with die $die" }
 
+        val captured = victims(state, player, to)
         state.steps[token] = to
-
-        val captured = ArrayList<Int>(2)
-        val landedOn = Board.ringIndex(player, to)
-        if (landedOn >= 0 && landedOn !in Board.safe) {
-            for (enemy in 0 until Board.TOKENS) {
-                val owner = Board.owner(enemy)
-                if (owner == player || state.seats[owner] == Seat.NONE) continue
-                if (Board.ringIndex(owner, state.steps[enemy]) == landedOn) {
-                    state.steps[enemy] = 0
-                    captured.add(enemy)
-                }
-            }
-        }
+        for (enemy in captured) state.steps[enemy] = 0
 
         val finished = to == Board.FINISH
         if (finished && hasWon(state, player)) state.winner = player
@@ -160,12 +149,30 @@ object Rules {
             token = token,
             from = from,
             to = to,
-            captured = captured.toIntArray(),
+            captured = captured,
             finished = finished,
             // Rolling a six, a capture, or getting a token home all buy
             // another roll rather than passing the dice on.
             extraTurn = die == 6 || captured.isNotEmpty() || finished,
         )
+    }
+
+    /**
+     * Enemy tokens a token of [player] would send home by landing on [to]:
+     * everyone else's on that ring square, unless it is a safe one. Shared by
+     * [apply] and the board's preview of where a move lands.
+     */
+    fun victims(state: GameState, player: Int, to: Int): IntArray {
+        val landedOn = Board.ringIndex(player, to)
+        if (landedOn < 0 || landedOn in Board.safe) return EMPTY
+        var count = 0
+        val buffer = IntArray(Board.TOKENS)
+        for (enemy in 0 until Board.TOKENS) {
+            val owner = Board.owner(enemy)
+            if (owner == player || state.seats[owner] == Seat.NONE) continue
+            if (Board.ringIndex(owner, state.steps[enemy]) == landedOn) buffer[count++] = enemy
+        }
+        return buffer.copyOf(count)
     }
 
     fun hasWon(state: GameState, player: Int): Boolean {

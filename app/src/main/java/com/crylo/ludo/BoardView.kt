@@ -107,6 +107,12 @@ class BoardView(context: Context) : View(context) {
     private var returned = 0f
     private var returner: ValueAnimator? = null
 
+    // Where each highlighted token would land, as steps, and whether it captures there.
+    private val landing = IntArray(Board.TOKENS)
+    private val landingCaptures = BooleanArray(Board.TOKENS)
+    private val landingX = FloatArray(Board.TOKENS)
+    private val landingY = FloatArray(Board.TOKENS)
+
     private var pulse = 0f
     private var pulser: ValueAnimator? = null
 
@@ -122,6 +128,14 @@ class BoardView(context: Context) : View(context) {
 
     fun setHighlights(tokens: IntArray) {
         highlights = tokens
+        val game = state
+        if (game != null) {
+            for (token in tokens) {
+                landing[token] = Rules.targetOf(game.steps[token], game.die)
+                landingCaptures[token] =
+                    landing[token] > 0 && Rules.victims(game, Board.owner(token), landing[token]).isNotEmpty()
+            }
+        }
         if (tokens.isEmpty()) stopPulse() else startPulse()
         invalidate()
     }
@@ -244,6 +258,7 @@ class BoardView(context: Context) : View(context) {
         drawCentre(canvas)
         layOutTokens(game)
         drawTokens(canvas, game)
+        drawLandings(canvas)
         canvas.restore()
     }
 
@@ -484,18 +499,73 @@ class BoardView(context: Context) : View(context) {
         canvas.drawCircle(x - radius * 0.28f, y - radius * 0.3f, radius * 0.24f, fill)
     }
 
+    /**
+     * Marks the square each highlighted token would land on: a dot, or a
+     * crosshair where the move captures. Drawn over the tokens so a crosshair
+     * shows around the token it would take.
+     */
+    private fun drawLandings(canvas: Canvas) {
+        if (highlights.isEmpty() || movingToken >= 0) return
+        for (token in highlights) {
+            val to = landing[token]
+            if (to <= 0) continue
+            val player = Board.owner(token)
+            Board.locate(player, to, token % Board.TOKENS_PER_PLAYER, here)
+            val x = here[0] * cell
+            val y = here[1] * cell
+            landingX[token] = x
+            landingY[token] = y
+
+            stroke.color = TOKEN_EDGE
+            if (landingCaptures[token]) {
+                val r = cell * (0.44f + 0.05f * pulse)
+                stroke.strokeWidth = cell * 0.09f
+                canvas.drawCircle(x, y, r, stroke)
+                for (i in 0 until 4) {
+                    val dx = if (i < 2) (if (i == 0) 1f else -1f) else 0f
+                    val dy = if (i >= 2) (if (i == 2) 1f else -1f) else 0f
+                    canvas.drawLine(x + dx * r * 0.7f, y + dy * r * 0.7f, x + dx * r * 1.3f, y + dy * r * 1.3f, stroke)
+                }
+            } else {
+                stroke.alpha = 150 + (105 * pulse).toInt()
+                stroke.strokeWidth = cell * 0.07f
+                canvas.drawCircle(x, y, cell * 0.3f, stroke)
+                stroke.alpha = 255
+                fill.color = Board.colors[player]
+                canvas.drawCircle(x, y, cell * 0.13f, fill)
+                stroke.strokeWidth = cell * 0.04f
+                canvas.drawCircle(x, y, cell * 0.13f, stroke)
+            }
+        }
+        stroke.strokeWidth = (cell * 0.05f).coerceAtLeast(1f)
+    }
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (event.actionMasked != MotionEvent.ACTION_DOWN) return false
         if (highlights.isEmpty() || movingToken >= 0) return false
 
+        // Token centres are in board space, which starts below the name strip.
+        val x = event.x
+        val y = event.y - boardTop
         var picked = -1
         var closest = cell * 0.85f
         for (token in highlights) {
-            // Token centres are in board space, which starts below the name strip.
-            val distance = hypot(event.x - xs[token], event.y - boardTop - ys[token])
+            val distance = hypot(x - xs[token], y - ys[token])
             if (distance < closest) {
                 closest = distance
                 picked = token
+            }
+        }
+        // Failing a token, a tap on where one would land picks that token.
+        if (picked < 0) {
+            closest = cell * 0.6f
+            for (token in highlights) {
+                if (landing[token] <= 0) continue
+                val distance = hypot(x - landingX[token], y - landingY[token])
+                if (distance < closest) {
+                    closest = distance
+                    picked = token
+                }
             }
         }
         if (picked < 0) return false

@@ -133,6 +133,21 @@ class RulesTest {
     }
 
     @Test
+    fun `victims predicts exactly what apply captures`() {
+        val state = game(Seat.HUMAN, Seat.BOT, Seat.HUMAN)
+        state.steps[0] = 1                       // red on ring index 1
+        state.steps[4] = 42                      // green on ring index 3
+        state.steps[5] = 42                      // and a second green with it
+        state.steps[8] = 29                      // yellow on ring index 3 too
+        state.steps[9] = 30                      // yellow elsewhere
+
+        val predicted = Rules.victims(state, 0, 3)
+        assertArrayEquals(intArrayOf(4, 5, 8), predicted)
+        assertArrayEquals(predicted, Rules.apply(state, 0, 2).captured)
+        assertEquals(0, Rules.victims(state, 0, 9).size)       // a star is safe
+    }
+
+    @Test
     fun `an enemy on a safe square is not captured`() {
         val state = soloVsGreen()
         state.steps[0] = 3
