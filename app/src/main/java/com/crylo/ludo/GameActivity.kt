@@ -104,6 +104,7 @@ class GameActivity : Activity() {
             for (player in 0 until Board.PLAYERS) {
                 if (seats[player] == Seat.HUMAN) profiles[player] = ids?.getOrNull(player) ?: Profiles.NONE
             }
+            Rules.pickStarter(this, random)
         }
     }
 

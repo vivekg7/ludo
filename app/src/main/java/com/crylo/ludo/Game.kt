@@ -1,5 +1,7 @@
 package com.crylo.ludo
 
+import kotlin.random.Random
+
 /** Who is sitting in one of the four seats. */
 enum class Seat { NONE, HUMAN, BOT }
 
@@ -181,6 +183,16 @@ object Rules {
             if (state.steps[t] != Board.FINISH) return false
         }
         return true
+    }
+
+    /**
+     * Hands the first roll of a new game to an occupied seat chosen at random.
+     * Going first is a small edge in Ludo, and without this it would always
+     * fall to whoever sits in the lowest seat.
+     */
+    fun pickStarter(state: GameState, random: Random) {
+        val occupied = state.seats.indices.filter { state.seats[it] != Seat.NONE }
+        state.current = occupied[random.nextInt(occupied.size)]
     }
 
     /** Next occupied seat clockwise. */

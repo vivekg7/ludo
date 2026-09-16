@@ -248,6 +248,20 @@ class RulesTest {
         Rules.passTurn(state)
         assertEquals(0, state.current)
     }
+
+    @Test
+    fun `the first roll goes to a random occupied seat`() {
+        val state = game(Seat.NONE, Seat.HUMAN, Seat.NONE, Seat.BOT)
+        val random = kotlin.random.Random(3)
+        val starts = IntArray(Board.PLAYERS)
+        repeat(1000) {
+            Rules.pickStarter(state, random)
+            starts[state.current]++
+        }
+        assertEquals(0, starts[0])
+        assertEquals(0, starts[2])
+        assertTrue("both seats get to start: ${starts.toList()}", starts[1] > 400 && starts[3] > 400)
+    }
 }
 
 class SaveTest {

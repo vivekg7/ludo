@@ -79,6 +79,8 @@ that came out unsigned is refused outright rather than archived under a release 
 
 The variant here is the one most people play:
 
+- **A random seat rolls first.** Going first is a small edge, so it is drawn
+  for each new game rather than always falling to the lowest occupied seat.
 - A **6** is needed to bring a token out of its yard.
 - A **6** grants another roll. **Three sixes in a row forfeits the turn** — the
   third six is not played.
