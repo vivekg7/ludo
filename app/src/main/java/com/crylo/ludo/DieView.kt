@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
 import android.view.View
 import kotlin.math.min
@@ -43,10 +44,16 @@ class DieView(context: Context) : View(context) {
     private var roller: ValueAnimator? = null
 
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val outline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeJoin = Paint.Join.ROUND
+    }
     private val rect = RectF()
+    private val bolt = Path()
     private val random = Random.Default
 
     init {
+        buildBolt()
         setOnClickListener {
             if (rollable && !rolling) onRollRequested?.invoke()
         }
@@ -101,19 +108,44 @@ class DieView(context: Context) : View(context) {
         fill.color = tint
         canvas.drawRoundRect(rect, size * 0.18f, size * 0.18f, fill)
 
-        fill.color = 0x33000000
-        canvas.drawRoundRect(rect, size * 0.18f, size * 0.18f, fill)
-        rect.inset(size * 0.045f, size * 0.045f)
+        // A thick border in the player's colour, so whose die it is reads
+        // from across the table.
+        rect.inset(size * BORDER, size * BORDER)
         fill.color = 0xFFFAF7EE.toInt()
-        canvas.drawRoundRect(rect, size * 0.15f, size * 0.15f, fill)
+        canvas.drawRoundRect(rect, size * 0.11f, size * 0.11f, fill)
 
-        drawPips(canvas, rect)
+        if (face in 1..6) drawPips(canvas, rect) else drawBolt(canvas, rect)
         canvas.restore()
     }
 
+    /** Shown on a die that has not been rolled yet this turn: tap to roll. */
+    private fun drawBolt(canvas: Canvas, box: RectF) {
+        canvas.save()
+        canvas.translate(box.centerX(), box.centerY())
+        val scale = box.width() * 0.4f
+        canvas.scale(scale, scale)
+        fill.color = tint
+        canvas.drawPath(bolt, fill)
+        outline.color = PIP
+        outline.strokeWidth = 0.09f
+        canvas.drawPath(bolt, outline)
+        canvas.restore()
+    }
+
+    /** A lightning bolt in unit coordinates, centred on the origin. */
+    private fun buildBolt() {
+        bolt.reset()
+        bolt.moveTo(0.22f, -0.95f)
+        bolt.lineTo(-0.62f, 0.12f)
+        bolt.lineTo(-0.04f, 0.12f)
+        bolt.lineTo(-0.24f, 0.95f)
+        bolt.lineTo(0.62f, -0.16f)
+        bolt.lineTo(0.04f, -0.16f)
+        bolt.close()
+    }
+
     private fun drawPips(canvas: Canvas, box: RectF) {
-        if (face !in 1..6) return
-        fill.color = 0xFF23262B.toInt()
+        fill.color = PIP
         val radius = box.width() * 0.088f
         val left = box.left + box.width() * 0.26f
         val mid = box.centerX()
@@ -142,5 +174,9 @@ class DieView(context: Context) : View(context) {
     private companion object {
         const val ROLL_MS = 560L
         const val FLICKS = 14
+
+        /** Width of the coloured border, as a fraction of the die's size. */
+        const val BORDER = 0.1f
+        const val PIP = 0xFF23262B.toInt()
     }
 }

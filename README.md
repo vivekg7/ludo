@@ -143,6 +143,9 @@ can be told apart; the turn banner uses the same names.
   waiting for them, not as blank.
 - **An arrow in each colour** sits on the last ring square before that colour's
   home run, pointing in, to show where its tokens turn off the ring.
+- **The die carries the current player's colour as a thick border**, and before
+  it is rolled shows a lightning bolt instead of a blank face, so it reads as
+  something to tap.
 
 ## Sound
 
