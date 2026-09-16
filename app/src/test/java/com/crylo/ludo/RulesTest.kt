@@ -80,6 +80,13 @@ class BoardTest {
     }
 
     @Test
+    fun `travel reads 100 percent only once every token is home`() {
+        assertEquals(0, Board.travelPercent(0))
+        assertEquals(99, Board.travelPercent(4 * Board.FINISH - 1))
+        assertEquals(100, Board.travelPercent(4 * Board.FINISH))
+    }
+
+    @Test
     fun `tokens in a yard land on four separate spots`() {
         val out = FloatArray(2)
         for (player in 0 until Board.PLAYERS) {

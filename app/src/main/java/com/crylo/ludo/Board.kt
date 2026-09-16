@@ -69,6 +69,12 @@ object Board {
 
     val names = arrayOf("Red", "Green", "Yellow", "Blue")
 
+    /**
+     * How much of the journey a player's tokens have covered, from their four
+     * positions added up, rounded down so 100 means every token is home.
+     */
+    fun travelPercent(totalSteps: Int): Int = totalSteps * 100 / (TOKENS_PER_PLAYER * FINISH)
+
     fun owner(token: Int) = token / TOKENS_PER_PLAYER
 
     fun firstToken(player: Int) = player * TOKENS_PER_PLAYER

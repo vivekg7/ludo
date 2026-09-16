@@ -128,7 +128,10 @@ Each seat's name is written beside its own yard — the top two above the board,
 the bottom two below it — and a triangle in the player's colour points from the
 current player's name at their yard. A profile shows its name, a guest its
 colour, and a bot "Bot 1", "Bot 2" and so on in seat order, so a table of bots
-can be told apart; the turn banner uses the same names.
+can be told apart; the turn banner uses the same names. Under each name is how
+far that player has got — "34% · 1/4 home" — where the percentage is the steps
+all four tokens have walked out of the 228 (4 × 57) it takes to bring them all
+home, rounded down so 100% only ever means the game is won.
 
 - **The names are drawn by `BoardView`, not laid out as separate views.** The
   board is sized to whatever space it gets, so labels in their own views would
@@ -139,6 +142,9 @@ can be told apart; the turn banner uses the same names.
   the state would jump to the next player while the last one's token was still
   moving. `GameActivity` sets it in `beginTurn`, alongside the banner and the
   die's colour, so all three change together.
+- **Progress counts what is drawn, not the state.** For the same reason, the
+  percentage is taken from where each token is on screen, so it ticks up as a
+  token walks and down as a captured one is walked home.
 - **Yards have a pocket per token**, so a yard whose tokens are out reads as
   waiting for them, not as blank.
 - **An arrow in each colour** sits on the last ring square before that colour's

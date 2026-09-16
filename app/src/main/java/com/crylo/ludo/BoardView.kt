@@ -46,6 +46,7 @@ class BoardView(context: Context) : View(context) {
     var names: Array<String> = Board.names
         set(value) {
             field = value
+            nameTexts.fill(null)
             invalidate()
         }
 
@@ -76,6 +77,11 @@ class BoardView(context: Context) : View(context) {
     }
 
     private val label = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
+
+    // Label text is rebuilt only when it changes, not on every frame.
+    private val nameTexts = arrayOfNulls<CharSequence>(Board.PLAYERS)
+    private val progressTexts = arrayOfNulls<String>(Board.PLAYERS)
+    private val progressShown = IntArray(Board.PLAYERS) { -1 }
 
     private val rect = RectF()
     private val path = Path()
@@ -238,7 +244,8 @@ class BoardView(context: Context) : View(context) {
         cell = cellFor(w, h)
         boardTop = LABEL_CELLS * cell
         stroke.strokeWidth = (cell * 0.05f).coerceAtLeast(1f)
-        label.textSize = cell * 0.62f
+        // Ellipsized for the new width on the next draw.
+        nameTexts.fill(null)
     }
 
     private fun cellFor(w: Int, h: Int) = min(w / Board.GRID.toFloat(), h / TALL_CELLS)
@@ -246,6 +253,8 @@ class BoardView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         val game = state ?: return
 
+        // Laid out first: the progress under each name follows the tokens as drawn.
+        layOutTokens(game)
         drawLabels(canvas, game)
 
         canvas.save()
@@ -256,7 +265,6 @@ class BoardView(context: Context) : View(context) {
         drawHomeArrows(canvas)
         drawHomeRuns(canvas)
         drawCentre(canvas)
-        layOutTokens(game)
         drawTokens(canvas, game)
         drawLandings(canvas)
         canvas.restore()
@@ -264,8 +272,9 @@ class BoardView(context: Context) : View(context) {
 
     /**
      * Each seat's name centred over its own yard, the top two above the board
-     * and the bottom two below it, with the turn marker between the current
-     * player's name and the board, pointing at their yard.
+     * and the bottom two below it. Working outwards from the board edge: the
+     * turn marker for the current player, how far their tokens have travelled,
+     * then the name.
      */
     private fun drawLabels(canvas: Canvas, game: GameState) {
         val boardBottom = boardTop + Board.GRID * cell
@@ -275,25 +284,67 @@ class BoardView(context: Context) : View(context) {
             val x = (Board.yardOrigin[player][0] + 3f) * cell
             val current = player == turn
 
-            // The name sits on the outer half of the strip, the marker on the inner.
-            val nameY = if (above) cell * 0.65f else boardBottom + cell * 1.4f
-            label.color = if (current) Color.WHITE else NAME_IDLE
-            label.typeface = if (current) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
-            val text = TextUtils.ellipsize(names[player], label, cell * 5.6f, TextUtils.TruncateAt.END)
-            canvas.drawText(text, 0, text.length, x, nameY - (label.ascent() + label.descent()) / 2, label)
+            if (current) {
+                val half = cell * 0.36f
+                val base = if (above) boardTop - cell * MARKER_BASE else boardBottom + cell * MARKER_BASE
+                val tip = if (above) boardTop - cell * MARKER_TIP else boardBottom + cell * MARKER_TIP
+                path.reset()
+                path.moveTo(x - half, base)
+                path.lineTo(x + half, base)
+                path.lineTo(x, tip)
+                path.close()
+                fill.color = Board.colors[player]
+                canvas.drawPath(path, fill)
+            }
 
-            if (!current) continue
-            val half = cell * 0.36f
-            val base = if (above) boardTop - cell * 0.78f else boardBottom + cell * 0.78f
-            val tip = if (above) boardTop - cell * 0.2f else boardBottom + cell * 0.2f
-            path.reset()
-            path.moveTo(x - half, base)
-            path.lineTo(x + half, base)
-            path.lineTo(x, tip)
-            path.close()
-            fill.color = Board.colors[player]
-            canvas.drawPath(path, fill)
+            fun rowY(distance: Float) = if (above) boardTop - cell * distance else boardBottom + cell * distance
+
+            label.textSize = cell * 0.42f
+            label.typeface = Typeface.DEFAULT
+            label.color = if (current) PROGRESS_CURRENT else PROGRESS_IDLE
+            drawCentred(canvas, progressText(game, player), x, rowY(PROGRESS_DISTANCE))
+
+            label.textSize = cell * 0.62f
+            label.typeface = if (current) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+            label.color = if (current) Color.WHITE else NAME_IDLE
+            drawCentred(canvas, nameText(player), x, rowY(NAME_DISTANCE))
         }
+    }
+
+    private fun drawCentred(canvas: Canvas, text: CharSequence, x: Float, y: Float) {
+        canvas.drawText(text, 0, text.length, x, y - (label.ascent() + label.descent()) / 2, label)
+    }
+
+    private fun nameText(player: Int): CharSequence = nameTexts[player] ?: run {
+        // Measured bold, the wider of the two faces, so a name never changes
+        // length when its turn comes round.
+        label.textSize = cell * 0.62f
+        label.typeface = Typeface.DEFAULT_BOLD
+        TextUtils.ellipsize(names[player], label, cell * 5.6f, TextUtils.TruncateAt.END)
+            .also { nameTexts[player] = it }
+    }
+
+    /**
+     * "34% · 1/4 home", from the tokens where they are drawn rather than where
+     * the state has them, so it counts up as a token walks and down as a
+     * captured one is walked home.
+     */
+    private fun progressText(game: GameState, player: Int): String {
+        val first = Board.firstToken(player)
+        var total = 0
+        var home = 0
+        for (token in first until first + Board.TOKENS_PER_PLAYER) {
+            val at = shownAt(token, game).toInt()
+            total += at
+            if (at == Board.FINISH) home++
+        }
+        val percent = Board.travelPercent(total)
+        val key = percent * (Board.TOKENS_PER_PLAYER + 1) + home
+        if (progressShown[player] != key || progressTexts[player] == null) {
+            progressShown[player] = key
+            progressTexts[player] = context.getString(R.string.progress, percent, home, Board.TOKENS_PER_PLAYER)
+        }
+        return progressTexts[player]!!
     }
 
     private fun drawPaper(canvas: Canvas) {
@@ -648,8 +699,14 @@ class BoardView(context: Context) : View(context) {
         const val MAX_RETURN_MS = 1000L
 
         /** Height of each name strip, in cells. */
-        const val LABEL_CELLS = 2f
+        const val LABEL_CELLS = 2.7f
         const val TALL_CELLS = Board.GRID + 2 * LABEL_CELLS
+
+        // Distances out from the board edge, in cells, of what the strip holds.
+        const val MARKER_TIP = 0.18f
+        const val MARKER_BASE = 0.72f
+        const val PROGRESS_DISTANCE = 1.22f
+        const val NAME_DISTANCE = 1.98f
 
         const val POCKET_RADIUS = 0.6f
         const val POCKET_TINT = 0.28f
@@ -660,6 +717,8 @@ class BoardView(context: Context) : View(context) {
         const val STAR = 0xFF9A9079.toInt()
         const val TOKEN_EDGE = 0xFF2B2B2B.toInt()
         const val NAME_IDLE = 0xFF9AA3AF.toInt()
+        const val PROGRESS_IDLE = 0xFF6B7380.toInt()
+        const val PROGRESS_CURRENT = 0xFFC9CFD6.toInt()
 
         /** [top] laid over [bottom] at the given opacity, both fully opaque. */
         fun blend(top: Int, bottom: Int, amount: Float): Int {
