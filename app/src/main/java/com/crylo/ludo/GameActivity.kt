@@ -39,6 +39,7 @@ class GameActivity : Activity() {
     private lateinit var hint: TextView
     private lateinit var newGame: Button
     private lateinit var soundToggle: TextView
+    private lateinit var facingToggle: TextView
     private lateinit var sounds: Sounds
 
     /**
@@ -78,6 +79,8 @@ class GameActivity : Activity() {
 
         setContentView(buildUi())
         showSoundToggle()
+        board.namesFaceTable = Saves.namesFaceTable(this)
+        showFacingToggle()
 
         board.onTokenPicked = { token -> play(token) }
         board.onSquareReached = { sounds.play(Sound.STEP) }
@@ -298,8 +301,9 @@ class GameActivity : Activity() {
             setPadding(dp(12), dp(20), dp(12), dp(20))
         }
 
-        // The sound toggle sits at the end of the banner row; the banner is
-        // padded by its width on both sides so the name stays centred.
+        // The name-facing toggle sits at the start of the banner row and the
+        // sound toggle at the end; the banner is padded by their width on both
+        // sides so the name stays centred.
         val header = FrameLayout(this)
         status = TextView(this).apply {
             textSize = 20f
@@ -319,6 +323,17 @@ class GameActivity : Activity() {
             }
         }
         header.addView(soundToggle, FrameLayout.LayoutParams(dp(TOGGLE_DP), dp(TOGGLE_DP), Gravity.END or Gravity.CENTER_VERTICAL))
+        facingToggle = TextView(this).apply {
+            text = "\u21C5" // ⇅
+            textSize = 24f
+            gravity = Gravity.CENTER
+            setOnClickListener {
+                board.namesFaceTable = !board.namesFaceTable
+                Saves.setNamesFaceTable(this@GameActivity, board.namesFaceTable)
+                showFacingToggle()
+            }
+        }
+        header.addView(facingToggle, FrameLayout.LayoutParams(dp(TOGGLE_DP), dp(TOGGLE_DP), Gravity.START or Gravity.CENTER_VERTICAL))
         root.addView(header, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
 
         hint = TextView(this).apply {
@@ -366,6 +381,12 @@ class GameActivity : Activity() {
         soundToggle.contentDescription = getString(if (sounds.enabled) R.string.mute else R.string.unmute)
     }
 
+    private fun showFacingToggle() {
+        facingToggle.setTextColor(if (board.namesFaceTable) ACCENT else TOGGLE_OFF)
+        facingToggle.contentDescription =
+            getString(if (board.namesFaceTable) R.string.names_face_holder else R.string.names_face_table)
+    }
+
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
     companion object {
@@ -381,6 +402,8 @@ class GameActivity : Activity() {
         private const val TOGGLE_DP = 48
 
         private const val BACKGROUND = 0xFF12161C.toInt()
+        private const val ACCENT = 0xFFFFB300.toInt()
+        private const val TOGGLE_OFF = 0xFF6B7380.toInt()
 
         fun newGame(context: Context, seats: Array<Seat>, profiles: IntArray): Intent =
             Intent(context, GameActivity::class.java)

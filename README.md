@@ -145,6 +145,10 @@ home, rounded down so 100% only ever means the game is won.
 - **Progress counts what is drawn, not the state.** For the same reason, the
   percentage is taken from where each token is on screen, so it ticks up as a
   token walks and down as a captured one is walked home.
+- **The ⇅ button turns the top two names upside down**, to face the players at
+  the far end of a phone lying flat on the table. It is off by default, because
+  a phone passed from hand to hand is always read from the bottom, and the choice
+  is remembered like mute.
 - **Yards have a pocket per token**, so a yard whose tokens are out reads as
   waiting for them, not as blank.
 - **An arrow in each colour** sits on the last ring square before that colour's
@@ -229,7 +233,7 @@ cannot be captured, so those tokens can never collide with anything.
 | `Sounds.kt`        | Synthesises and plays the sound effects                          |
 | `GameActivity.kt`  | The turn loop                                                    |
 | `SetupActivity.kt` | Seat picker, profile management and resume                       |
-| `Saves.kt`         | Saved game, profiles, last lineup and mute, in SharedPreferences |
+| `Saves.kt`         | Saved game, profiles, lineup, mute and name facing (preferences) |
 | `Insets.kt`        | Keeps content clear of the system bars under forced edge-to-edge |
 
 `Game.kt`, `Board.kt` and `Profile.kt` touch no Android APIs, so the rules and

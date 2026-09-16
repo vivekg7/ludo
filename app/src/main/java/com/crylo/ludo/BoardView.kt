@@ -51,6 +51,16 @@ class BoardView(context: Context) : View(context) {
         }
 
     /**
+     * Turns the names above the board upside down, to face the players sitting
+     * at that end of a phone lying flat on the table.
+     */
+    var namesFaceTable = false
+        set(value) {
+            field = value
+            invalidate()
+        }
+
+    /**
      * Seat the turn marker points at, or -1 for none. Set by the turn loop
      * rather than read from the state, which passes the dice on before the
      * previous player's token has finished sliding.
@@ -297,7 +307,18 @@ class BoardView(context: Context) : View(context) {
                 canvas.drawPath(path, fill)
             }
 
-            fun rowY(distance: Float) = if (above) boardTop - cell * distance else boardBottom + cell * distance
+            // Upside down, a point drawn at `d` from the top of the strip lands
+            // `d` from the board edge, so the same distances serve both ways.
+            val flipped = above && namesFaceTable
+            if (flipped) {
+                canvas.save()
+                canvas.rotate(180f, x, boardTop / 2)
+            }
+            fun rowY(distance: Float) = when {
+                flipped -> cell * distance
+                above -> boardTop - cell * distance
+                else -> boardBottom + cell * distance
+            }
 
             label.textSize = cell * 0.42f
             label.typeface = Typeface.DEFAULT
@@ -308,6 +329,8 @@ class BoardView(context: Context) : View(context) {
             label.typeface = if (current) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
             label.color = if (current) Color.WHITE else NAME_IDLE
             drawCentred(canvas, nameText(player), x, rowY(NAME_DISTANCE))
+
+            if (flipped) canvas.restore()
         }
     }
 

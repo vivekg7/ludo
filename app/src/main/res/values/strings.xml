@@ -40,6 +40,8 @@
     <string name="wins">%1$s wins!</string>
     <string name="new_game">New game</string>
     <string name="progress">%1$d%% · %2$d/%3$d home</string>
+    <string name="names_face_table">Turn the top names to face the far side of the table</string>
+    <string name="names_face_holder">Turn the top names back the right way up</string>
     <string name="mute">Mute sound</string>
     <string name="unmute">Turn sound on</string>
 </resources>
