@@ -156,8 +156,9 @@ home, rounded down so 100% only ever means the game is won.
   arrow on each start square shows which way tokens travel. The start arrows are
   translucent black rather than white, which vanished on yellow.
 - **The die carries the current player's colour as a thick border**, and before
-  it is rolled shows a lightning bolt instead of a blank face, so it reads as
-  something to tap.
+  it is rolled shows a lightning bolt instead of a blank face and swells gently,
+  so it reads as something to tap. Only a die waiting for a person swells; a bot
+  rolls on its own.
 - **Picking a token previews where each one lands**: a dot on the square, or a
   crosshair round the token that move would capture. Tapping the dot or
   crosshair plays that token, which saves hunting for the right one in a stack.

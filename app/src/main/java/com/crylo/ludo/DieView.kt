@@ -34,6 +34,7 @@ class DieView(context: Context) : View(context) {
             field = value
             isClickable = value
             alpha = if (value || rolling) 1f else 0.75f
+            if (value) breathe() else stopBreathing()
         }
 
     var onRollRequested: (() -> Unit)? = null
@@ -42,6 +43,10 @@ class DieView(context: Context) : View(context) {
     private var lastStep = -1
     private var tumble = 0f
     private var roller: ValueAnimator? = null
+
+    // A slow swell while the die waits for a person to roll it.
+    private var breath = 0f
+    private var breather: ValueAnimator? = null
 
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val outline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -89,9 +94,31 @@ class DieView(context: Context) : View(context) {
         }
     }
 
+    private fun breathe() {
+        if (breather != null) return
+        breather = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = BREATH_MS
+            repeatMode = ValueAnimator.REVERSE
+            repeatCount = ValueAnimator.INFINITE
+            addUpdateListener {
+                breath = it.animatedValue as Float
+                invalidate()
+            }
+            start()
+        }
+    }
+
+    private fun stopBreathing() {
+        breather?.cancel()
+        breather = null
+        breath = 0f
+        invalidate()
+    }
+
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
         roller?.cancel()
+        stopBreathing()
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -102,6 +129,10 @@ class DieView(context: Context) : View(context) {
         if (rolling) {
             // A small wobble reads as "rolling" without a sprite sheet.
             canvas.rotate(tumble * 360f, width / 2f, height / 2f)
+        }
+        if (breath > 0f) {
+            val swell = 1f + BREATH_SWELL * breath
+            canvas.scale(swell, swell, width / 2f, height / 2f)
         }
 
         rect.set(inset, inset, size - inset, size - inset)
@@ -174,6 +205,9 @@ class DieView(context: Context) : View(context) {
     private companion object {
         const val ROLL_MS = 560L
         const val FLICKS = 14
+
+        const val BREATH_MS = 650L
+        const val BREATH_SWELL = 0.08f
 
         /** Width of the coloured border, as a fraction of the die's size. */
         const val BORDER = 0.1f
