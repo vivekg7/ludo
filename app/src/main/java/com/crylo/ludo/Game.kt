@@ -19,6 +19,9 @@ class Move(
  */
 class GameState(val seats: Array<Seat>) {
 
+    /** Profile id per seat, or [Profiles.NONE] for a guest, a bot or an empty seat. */
+    val profiles = IntArray(Board.PLAYERS)
+
     /** Position of all sixteen tokens, indexed player * 4 + slot. See [Board]. */
     val steps = IntArray(Board.TOKENS)
 
@@ -44,14 +47,23 @@ class GameState(val seats: Array<Seat>) {
         append('|').append(die)
         append('|').append(sixStreak)
         append('|').append(winner)
+        append('|')
+        profiles.joinTo(this, ",")
     }
 
     companion object {
-        private const val SAVE_VERSION = 1
+        private const val SAVE_VERSION = 2
 
         fun decode(saved: String?): GameState? {
             val parts = saved?.split('|') ?: return null
-            if (parts.size != 7 || parts[0].toIntOrNull() != SAVE_VERSION) return null
+            // Version 1 predates profiles and is otherwise identical, so a game
+            // left in progress across the update still resumes, with guests.
+            val fields = when (parts[0].toIntOrNull()) {
+                1 -> 7
+                SAVE_VERSION -> 8
+                else -> return null
+            }
+            if (parts.size != fields) return null
             return try {
                 val seats = parts[1].split(',').map { Seat.entries[it.toInt()] }.toTypedArray()
                 val positions = parts[2].split(',').map { it.toInt() }
@@ -66,6 +78,13 @@ class GameState(val seats: Array<Seat>) {
                     sixStreak = parts[5].toInt().coerceIn(0, 2)
                     winner = parts[6].toInt().let { if (it in 0 until Board.PLAYERS) it else -1 }
                     if (seats[current] == Seat.NONE) current = seats.indexOfFirst { it != Seat.NONE }
+                    if (fields == 8) {
+                        val ids = parts[7].split(',').map { it.toInt() }
+                        if (ids.size != Board.PLAYERS) return null
+                        for (p in 0 until Board.PLAYERS) {
+                            profiles[p] = if (seats[p] == Seat.HUMAN && ids[p] > 0) ids[p] else Profiles.NONE
+                        }
+                    }
                 }
             } catch (e: RuntimeException) {
                 // A corrupt or older save is not worth crashing over; the

@@ -34,6 +34,9 @@ class GameActivity : Activity() {
     private lateinit var hint: TextView
     private lateinit var newGame: Button
 
+    /** What the banner calls each seat: its profile's name, or its colour. */
+    private val names = Board.names.copyOf()
+
     private val handler = Handler(Looper.getMainLooper())
     private val random = Random.Default
 
@@ -44,7 +47,13 @@ class GameActivity : Activity() {
         super.onCreate(savedInstanceState)
 
         state = (if (intent.getBooleanExtra(EXTRA_RESUME, false)) Saves.load(this) else null)
-            ?: GameState(seatsFromIntent())
+            ?: newStateFromIntent()
+
+        val profiles = Saves.profiles(this).associateBy { it.id }
+        for (player in 0 until Board.PLAYERS) {
+            // A profile deleted while its game was saved just falls back to the colour.
+            profiles[state.profiles[player]]?.let { names[player] = it.name }
+        }
 
         setContentView(buildUi())
 
@@ -54,10 +63,16 @@ class GameActivity : Activity() {
         beginTurn()
     }
 
-    private fun seatsFromIntent(): Array<Seat> {
+    private fun newStateFromIntent(): GameState {
         val raw = intent.getIntArrayExtra(EXTRA_SEATS)
-        return Array(Board.PLAYERS) { player ->
+        val seats = Array(Board.PLAYERS) { player ->
             raw?.getOrNull(player)?.let { Seat.entries[it] } ?: Seat.NONE
+        }
+        val ids = intent.getIntArrayExtra(EXTRA_PROFILES)
+        return GameState(seats).apply {
+            for (player in 0 until Board.PLAYERS) {
+                if (seats[player] == Seat.HUMAN) profiles[player] = ids?.getOrNull(player) ?: Profiles.NONE
+            }
         }
     }
 
@@ -80,7 +95,7 @@ class GameActivity : Activity() {
             return
         }
 
-        status.text = getString(R.string.turn_of, Board.names[state.current])
+        status.text = getString(R.string.turn_of, names[state.current])
         if (state.isBot(state.current)) {
             hint.text = getString(R.string.thinking)
             die.rollable = false
@@ -155,6 +170,9 @@ class GameActivity : Activity() {
 
     private fun afterMove(move: Move) {
         if (state.winner >= 0) {
+            // Credited here, where the win happens, and not in announceWinner,
+            // which beginTurn can also reach, so a game can never count twice.
+            Saves.saveProfiles(this, Profiles.recordGame(Saves.profiles(this), state))
             announceWinner()
             return
         }
@@ -193,7 +211,7 @@ class GameActivity : Activity() {
         board.clearHighlights()
         die.rollable = false
         busy = true
-        status.text = getString(R.string.wins, Board.names[state.winner])
+        status.text = getString(R.string.wins, names[state.winner])
         hint.text = ""
         newGame.visibility = View.VISIBLE
         Saves.clear(this)
@@ -272,6 +290,7 @@ class GameActivity : Activity() {
 
     companion object {
         private const val EXTRA_SEATS = "seats"
+        private const val EXTRA_PROFILES = "profiles"
         private const val EXTRA_RESUME = "resume"
 
         private const val BOT_THINK_MS = 620L
@@ -280,9 +299,10 @@ class GameActivity : Activity() {
 
         private const val BACKGROUND = 0xFF12161C.toInt()
 
-        fun newGame(context: Context, seats: Array<Seat>): Intent =
+        fun newGame(context: Context, seats: Array<Seat>, profiles: IntArray): Intent =
             Intent(context, GameActivity::class.java)
                 .putExtra(EXTRA_SEATS, IntArray(seats.size) { seats[it].ordinal })
+                .putExtra(EXTRA_PROFILES, profiles)
 
         fun resume(context: Context): Intent =
             Intent(context, GameActivity::class.java).putExtra(EXTRA_RESUME, true)

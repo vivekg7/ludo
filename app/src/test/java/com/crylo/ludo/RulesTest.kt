@@ -216,12 +216,37 @@ class SaveTest {
     }
 
     @Test
+    fun `seated profiles survive the round trip, and only on human seats`() {
+        val state = GameState(arrayOf(Seat.HUMAN, Seat.BOT, Seat.HUMAN, Seat.NONE))
+        state.profiles[0] = 4
+        state.profiles[2] = 9
+
+        val restored = requireNotNull(GameState.decode(state.encode()))
+        assertArrayEquals(intArrayOf(4, 0, 9, 0), restored.profiles)
+
+        // A profile against a bot seat is ignored rather than trusted.
+        val tampered = state.encode().substringBeforeLast('|') + "|4,7,9,0"
+        assertArrayEquals(intArrayOf(4, 0, 9, 0), requireNotNull(GameState.decode(tampered)).profiles)
+    }
+
+    @Test
+    fun `a game saved before profiles existed still resumes, with guests`() {
+        val v1 = "1|1,2,0,0|17," + "0,".repeat(14) + "0|0|4|1|-1"
+        val restored = requireNotNull(GameState.decode(v1))
+        assertEquals(17, restored.steps[0])
+        assertEquals(4, restored.die)
+        assertArrayEquals(IntArray(4), restored.profiles)
+    }
+
+    @Test
     fun `junk is rejected rather than crashing`() {
         assertNull(GameState.decode(null))
         assertNull(GameState.decode(""))
         assertNull(GameState.decode("1|0,0,0,0|0|0|0|0"))
         assertNull(GameState.decode("9|1,2,0,0|" + "0,".repeat(15) + "0|0|0|0|-1"))
         assertNull(GameState.decode("1|1,2,0,0|" + "0,".repeat(15) + "99|0|0|0|-1"))
+        assertNull(GameState.decode("2|1,2,0,0|" + "0,".repeat(15) + "0|0|0|0|-1"))
+        assertNull(GameState.decode("2|1,2,0,0|" + "0,".repeat(15) + "0|0|0|0|-1|1,2"))
     }
 }
 
@@ -247,5 +272,64 @@ class BotTest {
 
         val moves = Rules.legalMoves(state, 3)
         assertEquals(0, Bot.chooseMove(state, 3, moves, kotlin.random.Random(1)))
+    }
+}
+
+class ProfileTest {
+
+    private val family = listOf(Profile(1, "Mum", 5, 2), Profile(2, "Dad"), Profile(3, "Asha", 1, 1))
+
+    @Test
+    fun `profiles survive a round trip, commas in names included`() {
+        val profiles = family + Profile(7, "Nani, the champ", 12, 9)
+        assertEquals(profiles, Profiles.decode(Profiles.encode(profiles)))
+        assertEquals(emptyList<Profile>(), Profiles.decode(Profiles.encode(emptyList())))
+    }
+
+    @Test
+    fun `a damaged line loses only that profile`() {
+        val saved = "1,5,2,Mum\nnonsense\n0,0,0,Nobody\n2,x,0,Dad\n3,1,1,Asha\n3,0,0,Dup"
+        assertEquals(listOf(Profile(1, "Mum", 5, 2), Profile(3, "Asha", 1, 1)), Profiles.decode(saved))
+        assertEquals(emptyList<Profile>(), Profiles.decode(null))
+    }
+
+    @Test
+    fun `names are cleaned and must be present, short and unique`() {
+        assertEquals("Big Bro", Profiles.clean("  Big \t  Bro \n"))
+        assertEquals(Profiles.NameProblem.EMPTY, Profiles.problemWith(family, ""))
+        assertEquals(Profiles.NameProblem.TOO_LONG, Profiles.problemWith(family, "x".repeat(17)))
+        assertEquals(Profiles.NameProblem.TAKEN, Profiles.problemWith(family, "mum"))
+        assertNull(Profiles.problemWith(family, "Grandpa"))
+        // Renaming a profile to a new spelling of its own name is fine.
+        assertNull(Profiles.problemWith(family, "MUM", exceptId = 1))
+    }
+
+    @Test
+    fun `a won game credits every seated profile and the winner`() {
+        val state = GameState(arrayOf(Seat.HUMAN, Seat.BOT, Seat.HUMAN, Seat.HUMAN))
+        state.profiles[0] = 1
+        state.profiles[2] = 3
+        state.winner = 2
+
+        val updated = Profiles.recordGame(family, state)
+        assertEquals(Profile(1, "Mum", 6, 2), updated[0])
+        assertEquals(Profile(2, "Dad"), updated[1])          // not playing
+        assertEquals(Profile(3, "Asha", 2, 2), updated[2])
+    }
+
+    @Test
+    fun `an unfinished game, or a bot win, changes no wins`() {
+        val state = GameState(arrayOf(Seat.HUMAN, Seat.BOT, Seat.NONE, Seat.NONE))
+        state.profiles[0] = 1
+        assertEquals(family, Profiles.recordGame(family, state))
+
+        state.winner = 1
+        assertEquals(Profile(1, "Mum", 6, 2), Profiles.recordGame(family, state)[0])
+    }
+
+    @Test
+    fun `rename and delete touch only their profile`() {
+        assertEquals(listOf("Mum", "Papa", "Asha"), Profiles.rename(family, 2, "Papa").map { it.name })
+        assertEquals(listOf(1, 3), Profiles.delete(family, 2).map { it.id })
     }
 }

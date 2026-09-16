@@ -1,12 +1,14 @@
 # Ludo
 
 A lightweight, fully offline Ludo game for Android. Pass-and-play with up to
-four people on one device, any seat swappable for a bot.
+four people on one device, any seat swappable for a bot, and a profile for each
+person that keeps their wins.
 
-Requires **Android 12 (API 31)** or newer. The signed release APK is **31 KB**.
+Requires **Android 12 (API 31)** or newer. The signed release APK is **40 KB**.
 There are no runtime dependencies beyond the
-Kotlin standard library — no AndroidX, no Compose, no Material. The entire UI
-is two custom `View`s drawing on a `Canvas`, and the app requests no
+Kotlin standard library — no AndroidX, no Compose, no Material. The board and
+die are two custom `View`s drawing on a `Canvas`, the setup screen and its
+dialogs are plain platform widgets, and the app requests no
 permissions and opens no sockets.
 
 ## Building
@@ -90,6 +92,35 @@ The variant here is the one most people play:
 
 Tokens of the same colour may stack on one square. There is no blocking rule.
 
+## Profiles
+
+Each seat is a profile, a guest, a bot, or empty. A profile is a name and a
+record — games played and games won — kept on the device. The Profiles button
+on the setup screen lists everyone's record and renames or deletes them; a new
+profile can also be made straight from a seat.
+
+- **Only a finished game counts.** When a game is won, every seated profile
+  gets a game played and the winner's gets a win. An abandoned game changes
+  nothing, so quitting a losing game is not recorded as a loss — and a finished
+  game is credited in exactly one place, `GameActivity.afterMove`, so it cannot
+  count twice.
+- **Bots and guests have no record.** A guest seat is for a visitor who does
+  not need one.
+- **Seats hold a profile id, not a name.** Renaming someone mid-game relabels
+  their seat in the saved game. Ids come from a counter that is never wound
+  back, so deleting the newest profile cannot free its id for the next one and
+  have an old saved game credit the wrong person. A profile deleted while a
+  game is saved just shows as its colour.
+- **Names are unique, ignoring case.** The turn banner is the only thing that
+  tells two seats apart.
+- **The lineup is remembered** — saved on every seat change, not on Start — so
+  the same family does not pick seats again each game, and backing out of the
+  setup screen keeps the picks.
+
+The game save format is at version 2, which adds the per-seat profile ids. A
+version 1 save, from before profiles, still resumes with its human seats as
+guests, so a game left in progress across the update is not lost.
+
 ## How a position is stored
 
 Every token's position is a single integer, `steps`, and nearly all of the
@@ -120,15 +151,17 @@ cannot be captured, so those tokens can never collide with anything.
 | ------------------ | ---------------------------------------------------------------- |
 | `Board.kt`         | Board geometry: the ring, home runs, yards, safe squares         |
 | `Game.kt`          | `GameState`, its save encoding, and `Rules` — the whole variant  |
+| `Profile.kt`       | Profiles: names, win records, and their save encoding            |
 | `Bot.kt`           | One-ply heuristic opponent                                       |
 | `BoardView.kt`     | Draws the board and tokens, turns taps into token choices        |
 | `DieView.kt`       | The die, and its tumble animation                                |
 | `GameActivity.kt`  | The turn loop                                                    |
-| `SetupActivity.kt` | Seat picker and resume                                           |
-| `Saves.kt`         | The game in progress, as one string in SharedPreferences         |
+| `SetupActivity.kt` | Seat picker, profile management and resume                       |
+| `Saves.kt`         | The saved game, profiles and last lineup, in SharedPreferences   |
 | `Insets.kt`        | Keeps content clear of the system bars under forced edge-to-edge |
 
-`Game.kt` and `Board.kt` touch no Android APIs, so the rules are exercised from
+`Game.kt`, `Board.kt` and `Profile.kt` touch no Android APIs, so the rules and
+the profile records are exercised from
 plain JVM unit tests in `app/src/test`.
 
 Every transition in `GameActivity` goes through `beginTurn()`, which reads the
