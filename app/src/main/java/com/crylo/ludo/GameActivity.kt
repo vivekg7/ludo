@@ -41,7 +41,10 @@ class GameActivity : Activity() {
     private lateinit var soundToggle: TextView
     private lateinit var sounds: Sounds
 
-    /** What the banner calls each seat: its profile's name, or its colour. */
+    /**
+     * What the banner and the board call each seat: its profile's name, "Bot"
+     * and a number for a bot, or its colour for a guest.
+     */
     private val names = Board.names.copyOf()
 
     private val handler = Handler(Looper.getMainLooper())
@@ -62,7 +65,10 @@ class GameActivity : Activity() {
             ?: newStateFromIntent()
 
         val profiles = Saves.profiles(this).associateBy { it.id }
+        var bots = 0
         for (player in 0 until Board.PLAYERS) {
+            // Bots are numbered in seat order, so two of them can be told apart.
+            if (state.isBot(player)) names[player] = getString(R.string.bot_name, ++bots)
             // A profile deleted while its game was saved just falls back to the colour.
             profiles[state.profiles[player]]?.let { names[player] = it.name }
         }
@@ -103,6 +109,7 @@ class GameActivity : Activity() {
             return
         }
 
+        board.turn = state.current
         die.tint = Board.colors[state.current]
         die.face = state.die
 
@@ -250,6 +257,7 @@ class GameActivity : Activity() {
         board.clearHighlights()
         die.rollable = false
         busy = true
+        board.turn = state.winner
         status.text = getString(R.string.wins, names[state.winner])
         hint.text = ""
         newGame.visibility = View.VISIBLE
@@ -323,6 +331,7 @@ class GameActivity : Activity() {
         })
 
         board = BoardView(this)
+        board.names = names
         val holder = FrameLayout(this).apply {
             addView(board, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT, Gravity.CENTER))
         }

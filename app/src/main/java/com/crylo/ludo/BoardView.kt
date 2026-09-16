@@ -3,9 +3,13 @@ package com.crylo.ludo
 import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
+import android.graphics.Typeface
+import android.text.TextPaint
+import android.text.TextUtils
 import android.view.MotionEvent
 import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
@@ -21,6 +25,10 @@ import kotlin.math.sin
  *
  * All layout is done in board cells (0..15 on each axis) and scaled by [cell]
  * at draw time, so the same code works at any size without a single dp.
+ *
+ * Above and below the board is a strip [LABEL_CELLS] tall holding each seat's
+ * name over its own yard, and the turn marker. They are drawn here rather than
+ * as separate views so they stay lined up with the yards at any aspect ratio.
  */
 class BoardView(context: Context) : View(context) {
 
@@ -30,10 +38,31 @@ class BoardView(context: Context) : View(context) {
     /** Called each time a sliding token reaches the next square on its way. */
     var onSquareReached: (() -> Unit)? = null
 
+    /** What each seat is called, in seat order. */
+    var names: Array<String> = Board.names
+        set(value) {
+            field = value
+            invalidate()
+        }
+
+    /**
+     * Seat the turn marker points at, or -1 for none. Set by the turn loop
+     * rather than read from the state, which passes the dice on before the
+     * previous player's token has finished sliding.
+     */
+    var turn = -1
+        set(value) {
+            field = value
+            invalidate()
+        }
+
     private var state: GameState? = null
     private var highlights = IntArray(0)
 
     private var cell = 0f
+
+    /** Top of the board itself, below the upper name strip. */
+    private var boardTop = 0f
 
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
@@ -41,6 +70,8 @@ class BoardView(context: Context) : View(context) {
         style = Paint.Style.FILL
         color = 0x33000000
     }
+
+    private val label = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
 
     private val rect = RectF()
     private val path = Path()
@@ -145,19 +176,28 @@ class BoardView(context: Context) : View(context) {
     }
 
     override fun onMeasure(widthSpec: Int, heightSpec: Int) {
-        // The board is always square; take the smaller of whatever we are given.
-        val size = min(MeasureSpec.getSize(widthSpec), MeasureSpec.getSize(heightSpec))
-        setMeasuredDimension(size, size)
+        // The board is always square, with a name strip above and below it;
+        // take the largest cell that fits whatever we are given.
+        val size = cellFor(MeasureSpec.getSize(widthSpec), MeasureSpec.getSize(heightSpec))
+        setMeasuredDimension((size * Board.GRID).toInt(), (size * TALL_CELLS).toInt())
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-        cell = min(w, h) / Board.GRID.toFloat()
+        cell = cellFor(w, h)
+        boardTop = LABEL_CELLS * cell
         stroke.strokeWidth = (cell * 0.05f).coerceAtLeast(1f)
+        label.textSize = cell * 0.62f
     }
+
+    private fun cellFor(w: Int, h: Int) = min(w / Board.GRID.toFloat(), h / TALL_CELLS)
 
     override fun onDraw(canvas: Canvas) {
         val game = state ?: return
 
+        drawLabels(canvas, game)
+
+        canvas.save()
+        canvas.translate(0f, boardTop)
         drawPaper(canvas)
         drawYards(canvas)
         drawRing(canvas)
@@ -165,6 +205,41 @@ class BoardView(context: Context) : View(context) {
         drawCentre(canvas)
         layOutTokens(game)
         drawTokens(canvas, game)
+        canvas.restore()
+    }
+
+    /**
+     * Each seat's name centred over its own yard, the top two above the board
+     * and the bottom two below it, with the turn marker between the current
+     * player's name and the board, pointing at their yard.
+     */
+    private fun drawLabels(canvas: Canvas, game: GameState) {
+        val boardBottom = boardTop + Board.GRID * cell
+        for (player in 0 until Board.PLAYERS) {
+            if (game.seats[player] == Seat.NONE) continue
+            val above = Board.yardOrigin[player][1] == 0
+            val x = (Board.yardOrigin[player][0] + 3f) * cell
+            val current = player == turn
+
+            // The name sits on the outer half of the strip, the marker on the inner.
+            val nameY = if (above) cell * 0.65f else boardBottom + cell * 1.4f
+            label.color = if (current) Color.WHITE else NAME_IDLE
+            label.typeface = if (current) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+            val text = TextUtils.ellipsize(names[player], label, cell * 5.6f, TextUtils.TruncateAt.END)
+            canvas.drawText(text, 0, text.length, x, nameY - (label.ascent() + label.descent()) / 2, label)
+
+            if (!current) continue
+            val half = cell * 0.36f
+            val base = if (above) boardTop - cell * 0.78f else boardBottom + cell * 0.78f
+            val tip = if (above) boardTop - cell * 0.2f else boardBottom + cell * 0.2f
+            path.reset()
+            path.moveTo(x - half, base)
+            path.lineTo(x + half, base)
+            path.lineTo(x, tip)
+            path.close()
+            fill.color = Board.colors[player]
+            canvas.drawPath(path, fill)
+        }
     }
 
     private fun drawPaper(canvas: Canvas) {
@@ -346,7 +421,8 @@ class BoardView(context: Context) : View(context) {
         var picked = -1
         var closest = cell * 0.85f
         for (token in highlights) {
-            val distance = hypot(event.x - xs[token], event.y - ys[token])
+            // Token centres are in board space, which starts below the name strip.
+            val distance = hypot(event.x - xs[token], event.y - boardTop - ys[token])
             if (distance < closest) {
                 closest = distance
                 picked = token
@@ -414,11 +490,16 @@ class BoardView(context: Context) : View(context) {
         const val MIN_MOVE_MS = 180L
         const val MAX_MOVE_MS = 700L
 
+        /** Height of each name strip, in cells. */
+        const val LABEL_CELLS = 2f
+        const val TALL_CELLS = Board.GRID + 2 * LABEL_CELLS
+
         const val PAPER = 0xFFF6F1E4.toInt()
         const val GRID_LINE = 0xFF8C8674.toInt()
         const val SAFE_TINT = 0xFFE4DCC4.toInt()
         const val STAR = 0xFF9A9079.toInt()
         const val TOKEN_EDGE = 0xFF2B2B2B.toInt()
+        const val NAME_IDLE = 0xFF9AA3AF.toInt()
     }
 }
 

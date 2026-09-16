@@ -27,6 +27,7 @@
     <string name="save">Save</string>
     <string name="done">Done</string>
 
+    <string name="bot_name">Bot %1$d</string>
     <string name="turn_of">%1$s\'s turn</string>
     <string name="thinking">Thinking…</string>
     <string name="tap_to_roll">Tap the die to roll</string>

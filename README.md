@@ -112,8 +112,8 @@ profile can also be made straight from a seat.
   back, so deleting the newest profile cannot free its id for the next one and
   have an old saved game credit the wrong person. A profile deleted while a
   game is saved just shows as its colour.
-- **Names are unique, ignoring case.** The turn banner is the only thing that
-  tells two seats apart.
+- **Names are unique, ignoring case.** The turn banner and the names around the
+  board are the only things that tell two seats apart.
 - **The lineup is remembered** — saved on every seat change, not on Start — so
   the same family does not pick seats again each game, and backing out of the
   setup screen keeps the picks.
@@ -121,6 +121,24 @@ profile can also be made straight from a seat.
 The game save format is at version 2, which adds the per-seat profile ids. A
 version 1 save, from before profiles, still resumes with its human seats as
 guests, so a game left in progress across the update is not lost.
+
+## Game screen
+
+Each seat's name is written beside its own yard — the top two above the board,
+the bottom two below it — and a triangle in the player's colour points from the
+current player's name at their yard. A profile shows its name, a guest its
+colour, and a bot "Bot 1", "Bot 2" and so on in seat order, so a table of bots
+can be told apart; the turn banner uses the same names.
+
+- **The names are drawn by `BoardView`, not laid out as separate views.** The
+  board is sized to whatever space it gets, so labels in their own views would
+  drift away from the yards on any screen whose shape makes the height, not the
+  width, the limit. Drawn in board cells, they stay over their yards at any size.
+- **The turn marker follows the turn loop, not `state.current`.** A move passes
+  the dice in the state before its token starts to slide, so a marker read from
+  the state would jump to the next player while the last one's token was still
+  moving. `GameActivity` sets it in `beginTurn`, alongside the banner and the
+  die's colour, so all three change together.
 
 ## Sound
 
@@ -183,7 +201,7 @@ cannot be captured, so those tokens can never collide with anything.
 | `Game.kt`          | `GameState`, its save encoding, and `Rules` — the whole variant  |
 | `Profile.kt`       | Profiles: names, win records, and their save encoding            |
 | `Bot.kt`           | One-ply heuristic opponent                                       |
-| `BoardView.kt`     | Draws the board and tokens, turns taps into token choices        |
+| `BoardView.kt`     | Draws the board, tokens and seat names; turns taps into choices  |
 | `DieView.kt`       | The die, and its tumble animation                                |
 | `Sounds.kt`        | Synthesises and plays the sound effects                          |
 | `GameActivity.kt`  | The turn loop                                                    |
