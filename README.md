@@ -128,10 +128,13 @@ Each seat's name is written beside its own yard — the top two above the board,
 the bottom two below it — and a triangle in the player's colour points from the
 current player's name at their yard. A profile shows its name, a guest its
 colour, and a bot "Bot 1", "Bot 2" and so on in seat order, so a table of bots
-can be told apart; the turn banner uses the same names. Under each name is how
-far that player has got — "34% · 1/4 home" — where the percentage is the steps
-all four tokens have walked out of the 228 (4 × 57) it takes to bring them all
-home, rounded down so 100% only ever means the game is won.
+can be told apart; the turn banner uses the same names. Along the outer edge of
+each yard's coloured border is how far that player has got — "34% · 1/4 home" —
+where the percentage is the steps all four tokens have walked out of the 228
+(4 × 57) it takes to bring them all home, rounded down so 100% only ever means
+the game is won. It sits in the border rather than under the name so the name
+strips need only one line of text, which leaves more of the screen for the
+board; it is white on red, green and blue, and dark on yellow.
 
 - **The names are drawn by `BoardView`, not laid out as separate views.** The
   board is sized to whatever space it gets, so labels in their own views would
@@ -145,7 +148,8 @@ home, rounded down so 100% only ever means the game is won.
 - **Progress counts what is drawn, not the state.** For the same reason, the
   percentage is taken from where each token is on screen, so it ticks up as a
   token walks and down as a captured one is walked home.
-- **The ⇅ button turns the top two names upside down**, to face the players at
+- **The ⇅ button turns the top two names and progress upside down**, to face the
+  players at
   the far end of a phone lying flat on the table. It is off by default, because
   a phone passed from hand to hand is always read from the bottom, and the choice
   is remembered like mute.

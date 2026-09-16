@@ -263,14 +263,14 @@ class BoardView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         val game = state ?: return
 
-        // Laid out first: the progress under each name follows the tokens as drawn.
+        // Laid out first: the progress in each yard follows the tokens as drawn.
         layOutTokens(game)
         drawLabels(canvas, game)
 
         canvas.save()
         canvas.translate(0f, boardTop)
         drawPaper(canvas)
-        drawYards(canvas)
+        drawYards(canvas, game)
         drawRing(canvas)
         drawArrows(canvas)
         drawHomeRuns(canvas)
@@ -282,9 +282,8 @@ class BoardView(context: Context) : View(context) {
 
     /**
      * Each seat's name centred over its own yard, the top two above the board
-     * and the bottom two below it. Working outwards from the board edge: the
-     * turn marker for the current player, how far their tokens have travelled,
-     * then the name.
+     * and the bottom two below it, with the turn marker between the current
+     * player's name and the board, pointing at their yard.
      */
     private fun drawLabels(canvas: Canvas, game: GameState) {
         val boardBottom = boardTop + Board.GRID * cell
@@ -307,35 +306,22 @@ class BoardView(context: Context) : View(context) {
                 canvas.drawPath(path, fill)
             }
 
-            // Upside down, a point drawn at `d` from the top of the strip lands
-            // `d` from the board edge, so the same distances serve both ways.
-            val flipped = above && namesFaceTable
-            if (flipped) {
-                canvas.save()
-                canvas.rotate(180f, x, boardTop / 2)
-            }
-            fun rowY(distance: Float) = when {
-                flipped -> cell * distance
-                above -> boardTop - cell * distance
-                else -> boardBottom + cell * distance
-            }
-
-            label.textSize = cell * 0.42f
-            label.typeface = Typeface.DEFAULT
-            label.color = if (current) PROGRESS_CURRENT else PROGRESS_IDLE
-            drawCentred(canvas, progressText(game, player), x, rowY(PROGRESS_DISTANCE))
-
+            val y = if (above) boardTop - cell * NAME_DISTANCE else boardBottom + cell * NAME_DISTANCE
             label.textSize = cell * 0.62f
             label.typeface = if (current) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
             label.color = if (current) Color.WHITE else NAME_IDLE
-            drawCentred(canvas, nameText(player), x, rowY(NAME_DISTANCE))
-
-            if (flipped) canvas.restore()
+            drawCentred(canvas, nameText(player), x, y, above && namesFaceTable)
         }
     }
 
-    private fun drawCentred(canvas: Canvas, text: CharSequence, x: Float, y: Float) {
+    /** Draws [text] centred on a point, turned upside down about it if [flipped]. */
+    private fun drawCentred(canvas: Canvas, text: CharSequence, x: Float, y: Float, flipped: Boolean) {
+        if (flipped) {
+            canvas.save()
+            canvas.rotate(180f, x, y)
+        }
         canvas.drawText(text, 0, text.length, x, y - (label.ascent() + label.descent()) / 2, label)
+        if (flipped) canvas.restore()
     }
 
     private fun nameText(player: Int): CharSequence = nameTexts[player] ?: run {
@@ -376,7 +362,7 @@ class BoardView(context: Context) : View(context) {
         canvas.drawRoundRect(rect, cell * 0.3f, cell * 0.3f, fill)
     }
 
-    private fun drawYards(canvas: Canvas) {
+    private fun drawYards(canvas: Canvas, game: GameState) {
         for (player in 0 until Board.PLAYERS) {
             val o = Board.yardOrigin[player]
             fill.color = Board.colors[player]
@@ -384,7 +370,7 @@ class BoardView(context: Context) : View(context) {
             canvas.drawRoundRect(rect, cell * 0.35f, cell * 0.35f, fill)
 
             fill.color = PAPER
-            rect.inset(cell * 0.75f, cell * 0.75f)
+            rect.inset(cell * BORDER, cell * BORDER)
             canvas.drawRoundRect(rect, cell * 0.25f, cell * 0.25f, fill)
 
             // A pocket for each token, so a yard reads as waiting for its
@@ -400,11 +386,21 @@ class BoardView(context: Context) : View(context) {
             stroke.strokeWidth = (cell * 0.05f).coerceAtLeast(1f)
 
             // Empty seats are greyed out so it is obvious who is playing.
-            if (state?.seats?.get(player) == Seat.NONE) {
+            if (game.seats[player] == Seat.NONE) {
                 fill.color = 0xB3F6F1E4.toInt()
                 rect.set(o[0] * cell, o[1] * cell, (o[0] + 6) * cell, (o[1] + 6) * cell)
                 canvas.drawRoundRect(rect, cell * 0.35f, cell * 0.35f, fill)
+                continue
             }
+
+            // Progress runs along the yard's outer border, the edge beside its
+            // name, and faces the same way the name does.
+            val above = o[1] == 0
+            val borderY = if (above) o[1] + BORDER / 2 else o[1] + 6 - BORDER / 2
+            label.textSize = cell * 0.44f
+            label.typeface = Typeface.DEFAULT_BOLD
+            label.color = if (isLight(Board.colors[player])) BORDER_TEXT_DARK else BORDER_TEXT_LIGHT
+            drawCentred(canvas, progressText(game, player), (o[0] + 3f) * cell, borderY * cell, above && namesFaceTable)
         }
     }
 
@@ -729,14 +725,16 @@ class BoardView(context: Context) : View(context) {
         const val MAX_RETURN_MS = 1000L
 
         /** Height of each name strip, in cells. */
-        const val LABEL_CELLS = 2.7f
+        const val LABEL_CELLS = 2f
         const val TALL_CELLS = Board.GRID + 2 * LABEL_CELLS
 
         // Distances out from the board edge, in cells, of what the strip holds.
-        const val MARKER_TIP = 0.18f
-        const val MARKER_BASE = 0.72f
-        const val PROGRESS_DISTANCE = 1.22f
-        const val NAME_DISTANCE = 1.98f
+        const val MARKER_TIP = 0.2f
+        const val MARKER_BASE = 0.78f
+        const val NAME_DISTANCE = 1.36f
+
+        /** Width of the coloured border round each yard, in cells. */
+        const val BORDER = 0.75f
 
         const val POCKET_RADIUS = 0.6f
         const val POCKET_TINT = 0.28f
@@ -747,9 +745,17 @@ class BoardView(context: Context) : View(context) {
         const val STAR = 0xFF9A9079.toInt()
         const val TOKEN_EDGE = 0xFF2B2B2B.toInt()
         const val NAME_IDLE = 0xFF9AA3AF.toInt()
-        const val PROGRESS_IDLE = 0xFF6B7380.toInt()
-        const val PROGRESS_CURRENT = 0xFFC9CFD6.toInt()
+        const val BORDER_TEXT_LIGHT = 0xF2FFFFFF.toInt()
+        const val BORDER_TEXT_DARK = 0xB3000000.toInt()
         const val START_ARROW = 0x70000000
+
+        /** Whether dark text reads better than white on this colour. */
+        fun isLight(color: Int): Boolean {
+            val r = (color shr 16) and 0xFF
+            val g = (color shr 8) and 0xFF
+            val b = color and 0xFF
+            return r * 299 + g * 587 + b * 114 > 160_000
+        }
 
         /** [top] laid over [bottom] at the given opacity, both fully opaque. */
         fun blend(top: Int, bottom: Int, amount: Float): Int {
