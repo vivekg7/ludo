@@ -19,7 +19,7 @@ widgets, and the app requests no permissions and opens no sockets.
 ./gradlew testDebugUnitTest      # rules engine tests, plain JVM
 ```
 
-`local.properties` must point at an Android SDK with platform 36 installed.
+`local.properties` must point at an Android SDK with platform 37 installed.
 
 ### Signing
 

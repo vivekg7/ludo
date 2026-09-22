@@ -15,12 +15,12 @@ val keystoreProperties = Properties().apply {
 
 android {
     namespace = "com.crylo.ludo"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.crylo.ludo"
         minSdk = 31
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 4
         versionName = "1.3"
     }
