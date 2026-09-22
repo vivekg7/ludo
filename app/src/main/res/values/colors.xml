@@ -2,5 +2,6 @@
 <resources>
     <color name="board_bg">#FF12161C</color>
     <color name="accent">#FFFFB300</color>
-    <color name="ic_launcher_bg">#FF12161C</color>
+    <!-- The board's paper: the icon is the board, filling its mask. -->
+    <color name="ic_launcher_bg">#FFF6F1E4</color>
 </resources>

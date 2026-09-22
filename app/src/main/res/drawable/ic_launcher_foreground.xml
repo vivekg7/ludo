@@ -3,10 +3,36 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Four quadrants of a Ludo board with a pip in each. -->
-    <path android:fillColor="#E53935" android:pathData="M30,30h20v20h-20z" />
-    <path android:fillColor="#43A047" android:pathData="M58,30h20v20h-20z" />
-    <path android:fillColor="#FDD835" android:pathData="M58,58h20v20h-20z" />
-    <path android:fillColor="#1E88E5" android:pathData="M30,58h20v20h-20z" />
-    <path android:fillColor="#FFFFFF" android:pathData="M50,50h8v8h-8z" />
+    <!-- The board as the game draws it, laid out on the same 15x15 grid (see
+         Board.kt), spanning the 66-unit safe zone in the middle of the 108.
+         A round mask meets its edges and crops its corners, as if looking
+         down at a board through a round window; a board any larger lost the
+         outer edges of its yards too. The paper round it is the icon's
+         background colour, so no edge shows when a launcher zooms the icon
+         or masks it to another shape. -->
+    <!-- Each yard: its colour, the paper inside, and its four tokens waiting. -->
+    <path android:fillColor="#E53935" android:pathData="M21,21H47.4V47.4H21Z" />
+    <path android:fillColor="#F6F1E4" android:pathData="M25.4,24.3H43A1.1,1.1 0 0 1 44.1,25.4V43A1.1,1.1 0 0 1 43,44.1H25.4A1.1,1.1 0 0 1 24.3,43V25.4A1.1,1.1 0 0 1 25.4,24.3Z" />
+    <path android:fillColor="#E53935" android:pathData="M24.3,27.6a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0ZM24.3,40.8a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0ZM37.5,27.6a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0ZM37.5,40.8a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0Z" />
+    <path android:fillColor="#43A047" android:pathData="M60.6,21H87V47.4H60.6Z" />
+    <path android:fillColor="#F6F1E4" android:pathData="M65,24.3H82.6A1.1,1.1 0 0 1 83.7,25.4V43A1.1,1.1 0 0 1 82.6,44.1H65A1.1,1.1 0 0 1 63.9,43V25.4A1.1,1.1 0 0 1 65,24.3Z" />
+    <path android:fillColor="#43A047" android:pathData="M63.9,27.6a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0ZM63.9,40.8a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0ZM77.1,27.6a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0ZM77.1,40.8a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0Z" />
+    <path android:fillColor="#FDD835" android:pathData="M60.6,60.6H87V87H60.6Z" />
+    <path android:fillColor="#F6F1E4" android:pathData="M65,63.9H82.6A1.1,1.1 0 0 1 83.7,65V82.6A1.1,1.1 0 0 1 82.6,83.7H65A1.1,1.1 0 0 1 63.9,82.6V65A1.1,1.1 0 0 1 65,63.9Z" />
+    <path android:fillColor="#FDD835" android:pathData="M63.9,67.2a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0ZM63.9,80.4a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0ZM77.1,67.2a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0ZM77.1,80.4a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0Z" />
+    <path android:fillColor="#1E88E5" android:pathData="M21,60.6H47.4V87H21Z" />
+    <path android:fillColor="#F6F1E4" android:pathData="M25.4,63.9H43A1.1,1.1 0 0 1 44.1,65V82.6A1.1,1.1 0 0 1 43,83.7H25.4A1.1,1.1 0 0 1 24.3,82.6V65A1.1,1.1 0 0 1 25.4,63.9Z" />
+    <path android:fillColor="#1E88E5" android:pathData="M24.3,67.2a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0ZM24.3,80.4a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0ZM37.5,67.2a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0ZM37.5,80.4a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0Z" />
+    <!-- Home runs, as on the board. The start squares beside them are left
+         out: with no grid lines at this size they merged with the home runs
+         into L shapes that read as pipes. -->
+    <path android:fillColor="#E53935" android:pathData="M25.4,51.8H47.4V56.2H25.4Z" />
+    <path android:fillColor="#43A047" android:pathData="M51.8,25.4H56.2V47.4H51.8Z" />
+    <path android:fillColor="#FDD835" android:pathData="M60.6,51.8H82.6V56.2H60.6Z" />
+    <path android:fillColor="#1E88E5" android:pathData="M51.8,60.6H56.2V82.6H51.8Z" />
+    <!-- The centre: a triangle per colour, pointing in from its home run. -->
+    <path android:fillColor="#E53935" android:pathData="M47.4,47.4L47.4,60.6L54,54Z" />
+    <path android:fillColor="#43A047" android:pathData="M47.4,47.4L60.6,47.4L54,54Z" />
+    <path android:fillColor="#FDD835" android:pathData="M60.6,47.4L60.6,60.6L54,54Z" />
+    <path android:fillColor="#1E88E5" android:pathData="M47.4,60.6L60.6,60.6L54,54Z" />
 </vector>

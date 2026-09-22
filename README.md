@@ -122,7 +122,7 @@ saved game.
   drawn by `BoardView` in its `bare` mode (no name strips, no progress):
   seated colours with their tokens in the yard, empty ones greyed out as they
   will be in the game. It is kept small, since the grid below it is where
-  seats are picked.
+  seats are picked, and the launcher icon is the same board.
 - **The ⚙ beside the title opens [Settings](#settings).**
 - The screen scrolls when it does not fit, on a short phone or at a large font
   size, and is centred otherwise.
