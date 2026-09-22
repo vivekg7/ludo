@@ -194,6 +194,12 @@ board; it is white on red, green and blue, and dark on yellow.
   it is rolled shows a lightning bolt instead of a blank face and swells gently,
   so it reads as something to tap. Only a die waiting for a person swells; a bot
   rolls on its own.
+- **The die lands on its result while still turning.** The tumble's faces are
+  picked before it starts, with the result last and no face repeating the one
+  before it, and the face changes slow down as the spin eases out. An earlier
+  tumble picked each face at random and swapped in the result only when the
+  animation ended, so the die looked settled on one number and then jumped to
+  another.
 - **Picking a token previews where each one lands**: a faint ring on the square,
   or a faint ticked ring round the token that move would capture, with a faint
   dotted line along the squares on the way. A token leaving its yard gets no

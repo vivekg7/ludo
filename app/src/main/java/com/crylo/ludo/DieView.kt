@@ -8,6 +8,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.view.View
+import android.view.animation.LinearInterpolator
 import kotlin.math.min
 import kotlin.random.Random
 
@@ -42,6 +43,7 @@ class DieView(context: Context) : View(context) {
     private var rolling = false
     private var lastStep = -1
     private var tumble = 0f
+    private var pop = 0f
     private var roller: ValueAnimator? = null
 
     // A slow swell while the die waits for a person to roll it.
@@ -64,34 +66,63 @@ class DieView(context: Context) : View(context) {
         }
     }
 
-    /** Tumbles through random faces, lands on [result], then calls [onEnd]. */
+    /**
+     * Tumbles through random faces, lands on [result], then calls [onEnd].
+     *
+     * The faces are picked up front with [result] last, so the die settles on
+     * the face it will keep: it shows [result] while it is still turning, and
+     * never stops on one face only to jump to another.
+     */
     fun roll(result: Int, onEnd: () -> Unit) {
         roller?.cancel()
         rolling = true
         rollable = false
 
+        val faces = tumbleFaces(result)
+        var landed = -1f
+        lastStep = -1
         roller = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = ROLL_MS
+            interpolator = LinearInterpolator()
             addUpdateListener {
                 val t = it.animatedValue as Float
-                tumble = t
-                // Flick through faces quickly at first, then slow to a stop.
-                val step = (t * t * FLICKS).toInt()
+                // Ease out: the die spins and flicks fast at first, then
+                // slows into its landing.
+                val eased = 1f - (1f - t) * (1f - t) * (1f - t)
+                tumble = eased
+                val step = min((eased * faces.size).toInt(), faces.size - 1)
                 if (step != lastStep) {
                     lastStep = step
-                    face = random.nextInt(6) + 1
+                    face = faces[step]
+                    if (step == faces.size - 1) landed = t
                 }
+                // A small pop when the final face lands, shrinking back as the
+                // spin settles.
+                pop = if (landed >= 0f) POP * (1f - t) / (1f - landed) else 0f
                 invalidate()
             }
             doOnEnd {
                 rolling = false
                 tumble = 0f
+                pop = 0f
                 face = result
                 invalidate()
                 onEnd()
             }
             start()
         }
+    }
+
+    /** Random faces for the tumble, none repeating the one before, ending on [result]. */
+    private fun tumbleFaces(result: Int): IntArray {
+        val faces = IntArray(FLICKS)
+        faces[FLICKS - 1] = result
+        for (i in FLICKS - 2 downTo 0) {
+            var next: Int
+            do next = random.nextInt(6) + 1 while (next == faces[i + 1])
+            faces[i] = next
+        }
+        return faces
     }
 
     private fun breathe() {
@@ -127,8 +158,9 @@ class DieView(context: Context) : View(context) {
 
         canvas.save()
         if (rolling) {
-            // A small wobble reads as "rolling" without a sprite sheet.
-            canvas.rotate(tumble * 360f, width / 2f, height / 2f)
+            // A spin reads as "rolling" without a sprite sheet.
+            canvas.rotate(tumble * SPIN_DEGREES, width / 2f, height / 2f)
+            canvas.scale(1f + pop, 1f + pop, width / 2f, height / 2f)
         }
         if (breath > 0f) {
             val swell = 1f + BREATH_SWELL * breath
@@ -203,8 +235,13 @@ class DieView(context: Context) : View(context) {
     }
 
     private companion object {
-        const val ROLL_MS = 560L
-        const val FLICKS = 14
+        const val ROLL_MS = 620L
+        /** Faces shown during a roll, the last being the result. */
+        const val FLICKS = 10
+        /** A whole number of turns, so the die ends upright. */
+        const val SPIN_DEGREES = 720f
+        /** Extra scale when the result lands. */
+        const val POP = 0.12f
 
         const val BREATH_MS = 650L
         const val BREATH_SWELL = 0.08f
