@@ -178,7 +178,12 @@ class Sounds {
         }
     }
 
-    /** A tone whose pitch glides from [fromHz] to [toHz]. */
+    /**
+     * A tone whose pitch glides from [fromHz] to [toHz]. Only the capture uses
+     * it so far, but it takes the same arguments as [tone] and [bell] so the
+     * next effect can too.
+     */
+    @Suppress("SameParameterValue")
     private fun sweep(out: FloatArray, start: Float, fromHz: Float, toHz: Float, seconds: Float, gain: Float) {
         val from = (start * RATE).toInt()
         val count = minOf((seconds * RATE).toInt(), out.size - from)

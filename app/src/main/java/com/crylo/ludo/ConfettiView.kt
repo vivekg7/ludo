@@ -81,11 +81,11 @@ class ConfettiView(context: Context) : View(context) {
         val total = DURATION_MS / 1000f
         // Fades over the last stretch instead of vanishing mid-fall.
         val fade = ((total - t) / FADE_S).coerceIn(0f, 1f)
-        val size = dp(PIECE_DP)
+        val size = PIECE_DP * resources.displayMetrics.density
         for (i in 0 until COUNT) {
             val o = i * FIELDS
             val y = pieces[o + 1] + pieces[o + 2] * t
-            if (y < -size || y > height + size) continue
+            if (y !in -size..height + size) continue
             val x = pieces[o] + pieces[o + 3] * sin(pieces[o + 4] + t * SWAY_RATE)
             paint.color = palette[pieces[o + 7].toInt()]
             paint.alpha = (255 * fade).toInt()
@@ -96,8 +96,6 @@ class ConfettiView(context: Context) : View(context) {
             canvas.restore()
         }
     }
-
-    private fun dp(value: Float) = value * resources.displayMetrics.density
 
     private companion object {
         const val COUNT = 90

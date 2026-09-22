@@ -596,7 +596,7 @@ class BoardView(context: Context) : View(context) {
             // Progress runs along the yard's outer border, the edge beside its
             // name, and faces the same way the name does.
             val above = o[1] == 0
-            val borderY = if (above) o[1] + BORDER / 2 else o[1] + 6 - BORDER / 2
+            val borderY = if (above) BORDER / 2 else o[1] + 6 - BORDER / 2
             label.textSize = cell * 0.44f
             label.typeface = Typeface.DEFAULT_BOLD
             label.color = if (isLight(Board.colors[player])) BORDER_TEXT_DARK else BORDER_TEXT_LIGHT
@@ -790,7 +790,8 @@ class BoardView(context: Context) : View(context) {
         for (token in highlights) {
             val from = game.steps[token]
             val to = landing[token]
-            if (from <= 0 || to <= from) continue
+            // In its yard, or not moving forward: nothing to walk.
+            if (from !in 1..<to) continue
             val player = Board.owner(token)
             val slot = token % Board.TOKENS_PER_PLAYER
             // Dots between square centres; the first sits under the token and the

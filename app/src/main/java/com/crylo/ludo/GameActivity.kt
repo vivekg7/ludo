@@ -398,7 +398,7 @@ class GameActivity : Activity() {
 
         if (profile != null) {
             row.addView(TextView(this).apply {
-                this.text = getString(R.string.results_record, profile.wins, profile.played)
+                this.text = getString(R.string.record, profile.wins, profile.played)
                 textSize = 13f
                 setTextColor(Style.TEXT_DIM)
             }, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { leftMargin = dp(8) })

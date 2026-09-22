@@ -158,7 +158,7 @@ class SetupActivity : Activity() {
             seats[player] == Seat.NONE -> getString(R.string.seat_off_caption)
             profile == null -> getString(R.string.seat_guest_caption)
             profile.played == 0 -> getString(R.string.seat_no_games)
-            else -> getString(R.string.seat_record, profile.wins, profile.played)
+            else -> getString(R.string.record, profile.wins, profile.played)
         }
         val taken = seats[player] != Seat.NONE
 

@@ -1,0 +1,24 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- The launcher icon for themed icons, which the system tints in the
+         wallpaper's colours: the board of ic_launcher_foreground at the same
+         size and place, as lines only. Its paper is left out, since in one
+         colour it would fill the icon solid. -->
+    <!-- Each yard as its frame, the paper inside cut out, and its four tokens. -->
+    <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd" android:pathData="M21,21H47.4V47.4H21ZM25.4,24.3H43A1.1,1.1 0 0 1 44.1,25.4V43A1.1,1.1 0 0 1 43,44.1H25.4A1.1,1.1 0 0 1 24.3,43V25.4A1.1,1.1 0 0 1 25.4,24.3Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M24.3,27.6a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0ZM24.3,40.8a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0ZM37.5,27.6a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0ZM37.5,40.8a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0Z" />
+    <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd" android:pathData="M60.6,21H87V47.4H60.6ZM65,24.3H82.6A1.1,1.1 0 0 1 83.7,25.4V43A1.1,1.1 0 0 1 82.6,44.1H65A1.1,1.1 0 0 1 63.9,43V25.4A1.1,1.1 0 0 1 65,24.3Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M63.9,27.6a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0ZM63.9,40.8a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0ZM77.1,27.6a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0ZM77.1,40.8a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0Z" />
+    <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd" android:pathData="M60.6,60.6H87V87H60.6ZM65,63.9H82.6A1.1,1.1 0 0 1 83.7,65V82.6A1.1,1.1 0 0 1 82.6,83.7H65A1.1,1.1 0 0 1 63.9,82.6V65A1.1,1.1 0 0 1 65,63.9Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M63.9,67.2a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0ZM63.9,80.4a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0ZM77.1,67.2a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0ZM77.1,80.4a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0Z" />
+    <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd" android:pathData="M21,60.6H47.4V87H21ZM25.4,63.9H43A1.1,1.1 0 0 1 44.1,65V82.6A1.1,1.1 0 0 1 43,83.7H25.4A1.1,1.1 0 0 1 24.3,82.6V65A1.1,1.1 0 0 1 25.4,63.9Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M24.3,67.2a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0ZM24.3,80.4a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0ZM37.5,67.2a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0ZM37.5,80.4a3.3,3.3 0 1 0 6.6,0a3.3,3.3 0 1 0 -6.6,0Z" />
+    <!-- The home runs. -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M25.4,51.8H47.4V56.2H25.4ZM51.8,25.4H56.2V47.4H51.8ZM60.6,51.8H82.6V56.2H60.6ZM51.8,60.6H56.2V82.6H51.8Z" />
+    <!-- The centre's four triangles, drawn apart so they still read as four
+         in one colour. -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M47.75,48.46L47.75,59.54L53.3,54ZM48.46,47.75L59.54,47.75L54,53.3ZM60.25,48.46L60.25,59.54L54.7,54ZM48.46,60.25L59.54,60.25L54,54.7Z" />
+</vector>
