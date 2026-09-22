@@ -470,12 +470,6 @@ class GameActivity : Activity() {
     // --- ui ----------------------------------------------------------------
 
     private fun buildUi(): View {
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(BACKGROUND)
-            setPadding(dp(12), dp(20), dp(12), dp(20))
-        }
-
         // The settings button sits at the end of the banner row; the banner is
         // padded by its width on both sides so the name stays centred.
         val header = FrameLayout(this)
@@ -490,26 +484,18 @@ class GameActivity : Activity() {
         header.addView(Style.settingsButton(this) {
             startActivity(SettingsActivity.open(this))
         }, FrameLayout.LayoutParams(dp(TOGGLE_DP), dp(TOGGLE_DP), Gravity.END or Gravity.CENTER_VERTICAL))
-        root.addView(header, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
 
         hint = TextView(this).apply {
             textSize = 14f
             setTextColor(0xFF9AA3AF.toInt())
             gravity = Gravity.CENTER
         }
-        root.addView(hint, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
-            topMargin = dp(4)
-        })
 
         board = BoardView(this)
         board.names = names
         val holder = FrameLayout(this).apply {
             addView(board, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT, Gravity.CENTER))
         }
-        root.addView(holder, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f).apply {
-            topMargin = dp(14)
-            bottomMargin = dp(14)
-        })
 
         val bar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -525,7 +511,38 @@ class GameActivity : Activity() {
         bar.addView(showResults, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
             leftMargin = dp(16)
         })
-        root.addView(bar, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+
+        val root = if (Style.isLandscape(this)) {
+            // The board takes the whole height on the left, and the banner,
+            // the hint and the die stack in a column beside it: stacked above
+            // and below the board as in portrait, they would leave it a strip.
+            val side = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                addView(header, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+                addView(hint, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(4) })
+                addView(bar, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(24) })
+            }
+            LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(dp(12), dp(12), dp(12), dp(12))
+                addView(holder, LinearLayout.LayoutParams(0, MATCH_PARENT, 1f))
+                addView(side, LinearLayout.LayoutParams(dp(SIDE_DP), MATCH_PARENT).apply { leftMargin = dp(16) })
+            }
+        } else {
+            LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(12), dp(20), dp(12), dp(20))
+                addView(header, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+                addView(hint, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(4) })
+                addView(holder, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f).apply {
+                    topMargin = dp(14)
+                    bottomMargin = dp(14)
+                })
+                addView(bar, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+            }
+        }
+        root.setBackgroundColor(BACKGROUND)
         root.padForSystemBars()
 
         // The results and the confetti lie over the whole screen, not just the
@@ -555,7 +572,8 @@ class GameActivity : Activity() {
             isFillViewport = true
             val centre = FrameLayout(this@GameActivity).apply {
                 setOnClickListener { closeResults() }
-                addView(resultsCard, FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.CENTER).apply {
+                // Capped in width, or on a wide screen the rows spread too far apart to read.
+                addView(resultsCard, FrameLayout.LayoutParams(Style.readableWidth(this@GameActivity), WRAP_CONTENT, Gravity.CENTER).apply {
                     setMargins(dp(24), dp(24), dp(24), dp(24))
                 })
             }
@@ -582,6 +600,9 @@ class GameActivity : Activity() {
         private const val HAND_OVER_MS = 750L
 
         private const val TOGGLE_DP = 48
+
+        /** Width of the column beside the board in landscape. */
+        private const val SIDE_DP = 240
 
         private const val WIN_BUZZES = 3
         private const val WIN_BUZZ_GAP_MS = 180L

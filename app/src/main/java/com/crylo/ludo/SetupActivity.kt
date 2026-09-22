@@ -326,11 +326,14 @@ class SetupActivity : Activity() {
     // --- ui ----------------------------------------------------------------
 
     private fun buildUi(): View {
-        val root = LinearLayout(this).apply {
+        // The board, the title and the tagline; then everything to do with
+        // the next game. Stacked on a phone held upright, side by side on one
+        // turned sideways, where stacked they would need scrolling to reach Start.
+        val brand = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(20), dp(20), dp(20), dp(20))
+            gravity = Gravity.CENTER
         }
+        val form = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
 
         // The lineup drawn as the board it will be played on: seated colours
         // with their tokens waiting, empty ones greyed out, as in the game.
@@ -339,7 +342,7 @@ class SetupActivity : Activity() {
             bare = true
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
-        root.addView(preview, LinearLayout.LayoutParams(dp(PREVIEW_DP), dp(PREVIEW_DP)).apply {
+        brand.addView(preview, LinearLayout.LayoutParams(dp(PREVIEW_DP), dp(PREVIEW_DP)).apply {
             gravity = Gravity.CENTER_HORIZONTAL
         })
 
@@ -356,9 +359,9 @@ class SetupActivity : Activity() {
         title.addView(Style.settingsButton(this) {
             startActivity(SettingsActivity.open(this))
         }, FrameLayout.LayoutParams(dp(48), dp(48), Gravity.END or Gravity.CENTER_VERTICAL))
-        root.addView(title, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(8) })
+        brand.addView(title, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(8) })
 
-        root.addView(TextView(this).apply {
+        brand.addView(TextView(this).apply {
             text = getString(R.string.tagline)
             textSize = 14f
             setTextColor(Style.TEXT_DIM)
@@ -366,9 +369,9 @@ class SetupActivity : Activity() {
         }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dp(8) })
 
         savedSection = buildSavedSection()
-        root.addView(savedSection, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        form.addView(savedSection, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
 
-        root.addView(Style.heading(this, getString(R.string.heading_new)), headingParams())
+        form.addView(Style.heading(this, getString(R.string.heading_new)), headingParams())
         // Seats laid out as the yards are on the board, so it is plain which
         // are neighbours and which sit opposite: a list put Red and Green, the
         // first two, side by side on the board.
@@ -379,7 +382,7 @@ class SetupActivity : Activity() {
                     if (i > 0) leftMargin = dp(8)
                 })
             }
-            root.addView(line, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dp(8) })
+            form.addView(line, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dp(8) })
         }
 
         warning = TextView(this).apply {
@@ -387,24 +390,43 @@ class SetupActivity : Activity() {
             setTextColor(Style.WARNING)
             gravity = Gravity.CENTER
         }
-        root.addView(warning, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
+        form.addView(warning, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
             topMargin = dp(4)
         })
 
         startButton = Style.button(this, getString(R.string.start_game), Style.Kind.PRIMARY).apply {
             setOnClickListener { start() }
         }
-        root.addView(startButton, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(8) })
+        form.addView(startButton, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(8) })
 
-        root.addView(Style.button(this, getString(R.string.profiles), Style.Kind.QUIET).apply {
+        form.addView(Style.button(this, getString(R.string.profiles), Style.Kind.QUIET).apply {
             setOnClickListener { manageProfiles() }
         }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(4) })
 
-        // Scrolls on a short screen or at a large font size; centred otherwise.
+        val landscape = Style.isLandscape(this)
+        val root = LinearLayout(this).apply {
+            orientation = if (landscape) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(20), dp(20), dp(20), dp(20))
+        }
+        if (landscape) {
+            root.addView(brand, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+            root.addView(form, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1.4f).apply { leftMargin = dp(24) })
+        } else {
+            root.addView(brand, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+            root.addView(form, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        }
+
+        // Scrolls on a short screen or at a large font size; centred otherwise,
+        // and no wider than reads well on a tablet held upright.
+        val centre = FrameLayout(this).apply {
+            val width = if (landscape) MATCH_PARENT else Style.readableWidth(this@SetupActivity)
+            addView(root, FrameLayout.LayoutParams(width, WRAP_CONTENT, Gravity.CENTER))
+        }
         val scroll = ScrollView(this).apply {
             setBackgroundColor(Style.BACKGROUND)
             isFillViewport = true
-            addView(root, MATCH_PARENT, WRAP_CONTENT)
+            addView(centre, MATCH_PARENT, WRAP_CONTENT)
         }
         scroll.padForSystemBars()
         return scroll

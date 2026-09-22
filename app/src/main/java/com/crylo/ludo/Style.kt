@@ -9,6 +9,7 @@ import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
 import android.text.TextUtils
 import android.view.View
+import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
@@ -33,6 +34,8 @@ internal object Style {
     private const val RIPPLE_LIGHT = 0x29FFFFFF
     private const val RIPPLE_DARK = 0x29000000
 
+    private const val READABLE_DP = 560
+
     /** How much of a player's colour fills a taken seat's tile. */
     private const val TILE_TINT = 0.16f
 
@@ -43,6 +46,20 @@ internal object Style {
     enum class Kind { PRIMARY, SECONDARY, QUIET }
 
     fun dp(context: Context, value: Int) = (value * context.resources.displayMetrics.density).toInt()
+
+    /** Whether the window is wider than it is tall, as on a phone turned sideways. */
+    fun isLandscape(context: Context): Boolean {
+        val config = context.resources.configuration
+        return config.screenWidthDp > config.screenHeightDp
+    }
+
+    /**
+     * Width for a column of text and buttons: the whole width on a phone held
+     * upright, but no wider than [READABLE_DP] on a phone turned sideways or a
+     * tablet, where full-width rows and buttons are too long to take in.
+     */
+    fun readableWidth(context: Context): Int =
+        if (context.resources.configuration.screenWidthDp > READABLE_DP) dp(context, READABLE_DP) else MATCH_PARENT
 
     /** A rounded panel that ripples when touched; [outline] 0 for no border. */
     fun panel(context: Context, fill: Int, outline: Int = 0, radiusDp: Int = 14, darkRipple: Boolean = false): Drawable {

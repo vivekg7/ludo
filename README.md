@@ -4,7 +4,7 @@ A lightweight, fully offline Ludo game for Android. Pass-and-play with up to
 four people on one device, any seat swappable for a bot, and a profile for each
 person that keeps their wins.
 
-Requires **Android 12 (API 31)** or newer. The signed release APK is **62 KB**.
+Requires **Android 12 (API 31)** or newer. The signed release APK is **64 KB**.
 There are no runtime dependencies beyond the
 Kotlin standard library — no AndroidX, no Compose, no Material. The board and
 die are two custom `View`s drawing on a `Canvas`, the sound effects are
@@ -127,6 +127,11 @@ saved game.
 - **The ⚙ beside the title opens [Settings](#settings).**
 - The screen scrolls when it does not fit, on a short phone or at a large font
   size, and is centred otherwise.
+- **Sideways, it is two columns**: the board and title on the left, the saved
+  game, the seats and Start on the right, which stacked would need scrolling to
+  reach Start. On a tablet held upright the column is capped at 560dp wide
+  (`Style.readableWidth`), as are the settings page and the results card, so
+  rows and buttons do not stretch across the screen.
 
 ## Profiles
 
@@ -175,6 +180,14 @@ the game is won. It sits in the border rather than under the name so the name
 strips need only one line of text, which leaves more of the screen for the
 board; it is white on red, green and blue, and dark on yellow.
 
+- **The app turns with the phone.** Every screen used to be locked to portrait,
+  but Android 16 ignores that lock on tablets, foldables and Chromebooks, so it
+  had to lay out sideways anyway. Sideways the board takes the full height on
+  the left, and the banner, hint and die stack in a column beside it; above and
+  below the board, as upright, they would leave it a strip. Turning the phone
+  rebuilds the screen, which the game already survives: the state is written
+  before every animation (see [Layout](#layout)), and the saved instance state
+  restores it.
 - **The names are drawn by `BoardView`, not laid out as separate views.** The
   board is sized to whatever space it gets, so labels in their own views would
   drift away from the yards on any screen whose shape makes the height, not the
@@ -424,7 +437,7 @@ Estimated at 200–300 lines replacing the current tumble, with no change to
 the APK's size. Breathing, the landing pop and bot rolls carry over.
 
 Rejected: an OpenGL engine (Filament, SceneView) would add several MB to a
-roughly 62 KB APK for one small cube. A physics die bouncing across the
+roughly 64 KB APK for one small cube. A physics die bouncing across the
 board would be much more work, and it cannot easily land on a result chosen
 before the roll.
 

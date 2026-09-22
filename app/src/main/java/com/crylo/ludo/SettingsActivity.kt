@@ -67,10 +67,14 @@ class SettingsActivity : Activity() {
             Saves.setNamesFaceTable(this, it)
         })
 
+        // No wider than reads well, on a phone turned sideways or a tablet.
+        val centre = FrameLayout(this).apply {
+            addView(root, FrameLayout.LayoutParams(Style.readableWidth(this@SettingsActivity), WRAP_CONTENT, Gravity.CENTER_HORIZONTAL))
+        }
         val scroll = ScrollView(this).apply {
             setBackgroundColor(Style.BACKGROUND)
             isFillViewport = true
-            addView(root, MATCH_PARENT, WRAP_CONTENT)
+            addView(centre, MATCH_PARENT, WRAP_CONTENT)
         }
         scroll.padForSystemBars()
         return scroll
