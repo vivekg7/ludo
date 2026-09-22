@@ -351,6 +351,46 @@ background, and for a game started from the setup screen that intent means
 "new game": without the saved instance state the game would restart, and the
 next `onPause` would write the fresh game over the real save.
 
+## Improvements
+
+Ideas worked out but not built yet.
+
+### A 3D die, drawn on the Canvas
+
+The die spins flat today. It could tumble as a cube without adding a
+dependency, by staying in `DieView`'s `Canvas` drawing:
+
+- Keep the cube as 8 corners and 6 faces. Each frame, rotate it, project the
+  corners with a little perspective, and draw only the faces turned toward
+  the viewer. A cube never hides part of itself, so nothing needs sorting.
+- Draw each face as the flat face drawn now (tinted border, cream face,
+  pips), stretched onto its projected corners with `Matrix.setPolyToPoly`, so
+  the die keeps its look.
+- Darken each face by how far it is angled away from a fixed light. That is
+  most of what makes it read as 3D.
+- Choose the final orientation with the result facing the viewer, and turn
+  toward it from a random start with a couple of extra spins. The result is
+  still fixed before the roll starts, so the die cannot land on one number
+  and jump to another.
+
+Points that need care:
+
+- A real die layout: opposite faces add up to 7, and the faces round a corner
+  run in the right direction.
+- Blend rotations with quaternions. Interpolating angles one axis at a time
+  can snap or wobble partway through.
+- End with a slight tilt, or at 76dp the die lands looking flat.
+- Decide the idle look: a flat bolt face as now, or a tilted cube that shows
+  its depth.
+
+Estimated at 200–300 lines replacing the current tumble, with no change to
+the APK's size. Breathing, the landing pop and bot rolls carry over.
+
+Rejected: an OpenGL engine (Filament, SceneView) would add several MB to a
+roughly 60 KB APK for one small cube. A physics die bouncing across the
+board would be much more work, and it cannot easily land on a result chosen
+before the roll.
+
 ## License
 
 GPL-3.0. See [LICENSE](LICENSE).
