@@ -4,7 +4,7 @@ A lightweight, fully offline Ludo game for Android. Pass-and-play with up to
 four people on one device, any seat swappable for a bot, and a profile for each
 person that keeps their wins.
 
-Requires **Android 12 (API 31)** or newer. The signed release APK is **55 KB**.
+Requires **Android 12 (API 31)** or newer. The signed release APK is **60 KB**.
 There are no runtime dependencies beyond the
 Kotlin standard library — no AndroidX, no Compose, no Material. The board and
 die are two custom `View`s drawing on a `Canvas`, the sound effects are
@@ -215,6 +215,31 @@ board; it is white on red, green and blue, and dark on yellow.
   depending on how far the farthest had come. The capture sound and a vibration
   fire as the capturing token lands; the turn carries on once the captured
   tokens are home.
+- **Captures and tokens home get a reaction.** As a capturing token lands, an
+  emoji pops up in the middle of the capturing player's yard (😂, 😎) and of
+  each victim's yard (😭, 😤), and a taunt ("Back to base 😂") appears in a
+  bubble from the capturing player's name. A token reaching home gets a cheer
+  (🥳) in its yard. Bots react the same way as people.
+  - _Placement._ The emoji sit in the empty middle of each yard and the bubble
+    in the gap between the name and the board, where the turn marker is, which
+    it replaces while it shows. A chat panel beside the board was considered
+    and rejected: on one phone passed round a table nobody types, so it would
+    be the app speaking for the players; it would take space from the board;
+    and a log is read after the moment, while everyone is watching the board
+    as a capture happens.
+  - _Graded._ A capture is `CHEAP` if the victim had come at most 6 steps,
+    `BIG` from 40 steps on, where it was nearly at its home run, and `MULTI`
+    if it took two or more tokens; each grade has its own emoji and taunts.
+    Picks are random but never repeat the last from the same pool, so a long
+    game does not keep saying the same thing.
+  - _Out of the way._ Reactions last about two seconds and never hold up the
+    turn. The emoji follow the ⇅ setting like the names, and with animations
+    turned off they show still instead of popping. The 💬 button at the left
+    end of the die's row turns them off, and the choice is remembered like
+    mute.
+  - _From moves only._ A reaction is set off by a move as it lands, so a game
+    resumed or rebuilt after a rotation gets them for every move played from
+    then on, but does not replay one for a capture that happened before.
 - **A win opens the results** over a dimmed screen, after a short pause so the
   winning token is seen arriving, with confetti in the four colours. Everyone is
   listed in finishing order: the winner, then by tokens home, then by ground
@@ -293,17 +318,18 @@ cannot be captured, so those tokens can never collide with anything.
 | `Profile.kt`       | Profiles: names, win records, and their save encoding            |
 | `Bot.kt`           | One-ply heuristic opponent                                       |
 | `BoardView.kt`     | Draws the board, tokens and seat names; turns taps into choices  |
+| `Reactions.kt`     | Which emoji and taunts a capture or a token home sets off        |
 | `DieView.kt`       | The die, and its tumble animation                                |
 | `ConfettiView.kt`  | The confetti over the results of a won game                      |
 | `Style.kt`         | Colours, buttons and panels shared by both screens               |
 | `Sounds.kt`        | Synthesises and plays the sound effects                          |
 | `GameActivity.kt`  | The turn loop, and the results of a won game                     |
 | `SetupActivity.kt` | Seat picker, profile leaderboard and resume                      |
-| `Saves.kt`         | Saved game, profiles, lineup, mute and name facing (preferences) |
+| `Saves.kt`         | Saved game, profiles, lineup and the toggles (preferences)       |
 | `Insets.kt`        | Keeps content clear of the system bars under forced edge-to-edge |
 
-`Game.kt`, `Board.kt` and `Profile.kt` touch no Android APIs, so the rules and
-the profile records are exercised from
+`Game.kt`, `Board.kt`, `Profile.kt` and `Reactions.kt` touch no Android APIs,
+so the rules, the profile records and the reaction picks are exercised from
 plain JVM unit tests in `app/src/test`.
 
 Every transition in `GameActivity` goes through `beginTurn()`, which reads the

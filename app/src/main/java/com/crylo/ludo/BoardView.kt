@@ -8,11 +8,13 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.os.SystemClock
 import android.text.TextPaint
 import android.text.TextUtils
 import android.view.MotionEvent
 import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.animation.OvershootInterpolator
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -39,8 +41,11 @@ class BoardView(context: Context) : View(context) {
     /** Called each time a sliding token reaches the next square on its way. */
     var onSquareReached: (() -> Unit)? = null
 
-    /** Called as a capturing token lands, when its victims start back home. */
-    var onCapture: (() -> Unit)? = null
+    /**
+     * Called as a capturing token lands, when its victims start back home,
+     * with the capturing token, the tokens it took and how far each had come.
+     */
+    var onCapture: ((token: Int, captured: IntArray, capturedFrom: IntArray) -> Unit)? = null
 
     /** What each seat is called, in seat order. */
     var names: Array<String> = Board.names
@@ -146,6 +151,17 @@ class BoardView(context: Context) : View(context) {
     private var pulse = 0f
     private var pulser: ValueAnimator? = null
 
+    // Per seat: the emoji in its yard and the line in a bubble under its name,
+    // with when each appeared, or null when it has none.
+    private val emojis = arrayOfNulls<String>(Board.PLAYERS)
+    private val emojiSince = LongArray(Board.PLAYERS)
+    private val sayings = arrayOfNulls<String>(Board.PLAYERS)
+    private val sayingTexts = arrayOfNulls<CharSequence>(Board.PLAYERS)
+    private val sayingSince = LongArray(Board.PLAYERS)
+    private var reactionTicker: ValueAnimator? = null
+    private val popIn = OvershootInterpolator(POP_OVERSHOOT)
+    private val emojiPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
+
     init {
         buildStar()
         buildArrow()
@@ -212,7 +228,7 @@ class BoardView(context: Context) : View(context) {
                     invalidate()
                     onEnd()
                 } else {
-                    onCapture?.invoke()
+                    onCapture?.invoke(token, frozenTokens, frozenSteps)
                     sendHome(onEnd)
                 }
             }
@@ -241,7 +257,54 @@ class BoardView(context: Context) : View(context) {
         }
     }
 
+    /**
+     * Pops [emoji] up in the middle of [player]'s yard for a moment. It asks
+     * nothing of the turn loop, which carries on underneath it.
+     */
+    fun react(player: Int, emoji: String) {
+        emojis[player] = emoji
+        emojiSince[player] = SystemClock.uptimeMillis()
+        showReactions(EMOJI_MS)
+    }
+
+    /** Shows [line] for a moment in a bubble coming from [player]'s name. */
+    fun say(player: Int, line: String) {
+        sayings[player] = line
+        sayingTexts[player] = null
+        sayingSince[player] = SystemClock.uptimeMillis()
+        showReactions(BUBBLE_MS)
+    }
+
+    fun clearReactions() {
+        emojis.fill(null)
+        sayings.fill(null)
+        sayingTexts.fill(null)
+        reactionTicker?.cancel()
+        reactionTicker = null
+        invalidate()
+    }
+
+    private fun showReactions(lasting: Long) {
+        invalidate()
+        if (ValueAnimator.areAnimatorsEnabled()) {
+            if (reactionTicker == null) {
+                // Only redraws; how far along each reaction is comes from the clock.
+                reactionTicker = ValueAnimator.ofFloat(0f, 1f).apply {
+                    duration = 1000
+                    repeatCount = ValueAnimator.INFINITE
+                    addUpdateListener { invalidate() }
+                    start()
+                }
+            }
+        } else {
+            // With animations off nothing ticks, so the reaction is shown still
+            // and a redraw is booked for when it is due to go.
+            postDelayed({ invalidate() }, lasting + 1)
+        }
+    }
+
     fun cancelAnimations() {
+        clearReactions()
         mover?.cancel()
         mover = null
         returner?.cancel()
@@ -281,6 +344,8 @@ class BoardView(context: Context) : View(context) {
 
         // Laid out first: the progress in each yard follows the tokens as drawn.
         layOutTokens(game)
+        val now = SystemClock.uptimeMillis()
+        expireReactions(now)
         if (!bare) drawLabels(canvas, game)
 
         canvas.save()
@@ -294,7 +359,9 @@ class BoardView(context: Context) : View(context) {
         drawRoutes(canvas, game)
         drawTokens(canvas, game)
         drawLandings(canvas)
+        if (!bare) drawEmojis(canvas, game, now)
         canvas.restore()
+        if (!bare) drawBubbles(canvas, game, now)
     }
 
     /**
@@ -310,7 +377,8 @@ class BoardView(context: Context) : View(context) {
             val x = (Board.yardOrigin[player][0] + 3f) * cell
             val current = player == turn
 
-            if (current) {
+            // A bubble from the name sits where the marker does, and says more.
+            if (current && sayings[player] == null) {
                 val half = cell * 0.36f
                 val base = if (above) boardTop - cell * MARKER_BASE else boardBottom + cell * MARKER_BASE
                 val tip = if (above) boardTop - cell * MARKER_TIP else boardBottom + cell * MARKER_TIP
@@ -328,6 +396,119 @@ class BoardView(context: Context) : View(context) {
             label.typeface = if (current) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
             label.color = if (current) Color.WHITE else NAME_IDLE
             drawCentred(canvas, nameText(player), x, y, above && namesFaceTable)
+        }
+    }
+
+    /** Forgets reactions that have run their time, and stops redrawing when none are left. */
+    private fun expireReactions(now: Long) {
+        var live = false
+        for (player in 0 until Board.PLAYERS) {
+            if (emojis[player] != null && now - emojiSince[player] >= EMOJI_MS) emojis[player] = null
+            if (sayings[player] != null && now - sayingSince[player] >= BUBBLE_MS) {
+                sayings[player] = null
+                sayingTexts[player] = null
+            }
+            if (emojis[player] != null || sayings[player] != null) live = true
+        }
+        if (!live && reactionTicker != null) {
+            reactionTicker?.cancel()
+            reactionTicker = null
+        }
+    }
+
+    /**
+     * How far through its life a reaction is shown: its scale as it pops in,
+     * and its opacity as it fades out. Still and whole with animations off.
+     */
+    private fun popScale(age: Long): Float =
+        if (!ValueAnimator.areAnimatorsEnabled() || age >= POP_MS) 1f else popIn.getInterpolation(age / POP_MS.toFloat())
+
+    private fun fadeAlpha(age: Long, lasting: Long): Int =
+        if (!ValueAnimator.areAnimatorsEnabled()) 255 else (255 * ((lasting - age) / FADE_MS.toFloat()).coerceIn(0f, 1f)).toInt()
+
+    /**
+     * Each yard's emoji, in the empty middle between its four pockets, bobbing
+     * gently while it lasts. It faces the way that yard's name does.
+     */
+    private fun drawEmojis(canvas: Canvas, game: GameState, now: Long) {
+        for (player in 0 until Board.PLAYERS) {
+            val emoji = emojis[player] ?: continue
+            if (game.seats[player] == Seat.NONE) continue
+            val age = now - emojiSince[player]
+            val o = Board.yardOrigin[player]
+            val x = (o[0] + 3f) * cell
+            val bob = if (ValueAnimator.areAnimatorsEnabled()) sin(age * BOB_RATE) * cell * BOB_CELLS else 0f
+            val y = (o[1] + 3f) * cell + bob
+            val scale = popScale(age)
+
+            canvas.save()
+            canvas.scale(scale, scale, x, y)
+            if (o[1] == 0 && namesFaceTable) canvas.rotate(180f, x, y)
+            emojiPaint.textSize = cell * EMOJI_CELLS
+            emojiPaint.alpha = fadeAlpha(age, EMOJI_MS)
+            canvas.drawText(emoji, x, y - (emojiPaint.ascent() + emojiPaint.descent()) / 2, emojiPaint)
+            canvas.restore()
+        }
+    }
+
+    /**
+     * A speech bubble between each talking seat's name and the board, its tail
+     * pointing at the name so it reads as that player speaking. It keeps to
+     * its own half of the strip, clear of the other name's bubble.
+     */
+    private fun drawBubbles(canvas: Canvas, game: GameState, now: Long) {
+        val boardBottom = boardTop + Board.GRID * cell
+        for (player in 0 until Board.PLAYERS) {
+            val line = sayings[player] ?: continue
+            if (game.seats[player] == Seat.NONE) continue
+            val age = now - sayingSince[player]
+            val o = Board.yardOrigin[player]
+            val above = o[1] == 0
+            val nameX = (o[0] + 3f) * cell
+
+            label.textSize = cell * BUBBLE_TEXT
+            label.typeface = Typeface.DEFAULT_BOLD
+            val text = sayingTexts[player]
+                ?: TextUtils.ellipsize(line, label, cell * (BUBBLE_MAX - 2 * BUBBLE_PAD), TextUtils.TruncateAt.END)
+                    .also { sayingTexts[player] = it }
+            val width = label.measureText(text, 0, text.length) + 2 * BUBBLE_PAD * cell
+
+            // Centred under the name, then nudged back inside its half.
+            val halfLo = if (o[0] == 0) BUBBLE_MARGIN * cell else (Board.GRID / 2f + BUBBLE_MARGIN / 2) * cell
+            val halfHi = if (o[0] == 0) (Board.GRID / 2f - BUBBLE_MARGIN / 2) * cell else (Board.GRID - BUBBLE_MARGIN) * cell
+            val left = (nameX - width / 2).coerceIn(halfLo, halfHi - width)
+            val near = if (above) boardTop - BUBBLE_GAP * cell else boardBottom + BUBBLE_GAP * cell
+            val far = if (above) near - BUBBLE_HEIGHT * cell else near + BUBBLE_HEIGHT * cell
+            rect.set(left, min(near, far), left + width, maxOf(near, far))
+
+            // Grows out of the tail, where the name is.
+            val scale = popScale(age)
+            val alpha = fadeAlpha(age, BUBBLE_MS)
+            canvas.save()
+            canvas.scale(scale, scale, nameX, far)
+
+            val tailX = nameX.coerceIn(rect.left + cell * 0.4f, rect.right - cell * 0.4f)
+            val tailTip = if (above) far - BUBBLE_TAIL * cell else far + BUBBLE_TAIL * cell
+            path.reset()
+            path.addRoundRect(rect, cell * 0.3f, cell * 0.3f, Path.Direction.CW)
+            path.moveTo(tailX - cell * 0.2f, far)
+            path.lineTo(nameX, tailTip)
+            path.lineTo(tailX + cell * 0.2f, far)
+            path.close()
+            fill.color = BUBBLE
+            fill.alpha = alpha
+            canvas.drawPath(path, fill)
+            // Edged in the speaker's colour, the same as their yard and marker.
+            stroke.color = Board.colors[player]
+            stroke.alpha = alpha
+            stroke.strokeWidth = cell * 0.07f
+            canvas.drawRoundRect(rect, cell * 0.3f, cell * 0.3f, stroke)
+            stroke.strokeWidth = (cell * 0.05f).coerceAtLeast(1f)
+
+            label.color = BUBBLE_TEXT_COLOR
+            label.alpha = alpha
+            drawCentred(canvas, text, rect.centerX(), rect.centerY(), above && namesFaceTable)
+            canvas.restore()
         }
     }
 
@@ -788,6 +969,33 @@ class BoardView(context: Context) : View(context) {
         const val BORDER = 0.75f
 
         const val DOTS_PER_SQUARE = 3
+
+        const val EMOJI_MS = 1800L
+        const val BUBBLE_MS = 2200L
+        const val POP_MS = 260L
+        const val POP_OVERSHOOT = 3f
+        const val FADE_MS = 350L
+        const val BOB_RATE = 0.009f
+        const val BOB_CELLS = 0.08f
+
+        /**
+         * Emoji size, in cells. The gap between a yard's pockets is about three
+         * across, but an emoji that fills it drowns the yard; at a bit over one
+         * cell, about a token and a half, it reads as a reaction beside the tokens.
+         */
+        const val EMOJI_CELLS = 1.2f
+
+        // The bubble, in cells. It fills the gap between the board edge and the
+        // name, which is about one cell deep.
+        const val BUBBLE_GAP = 0.1f
+        const val BUBBLE_HEIGHT = 0.72f
+        const val BUBBLE_TAIL = 0.16f
+        const val BUBBLE_TEXT = 0.44f
+        const val BUBBLE_PAD = 0.3f
+        const val BUBBLE_MAX = 7f
+        const val BUBBLE_MARGIN = 0.15f
+        const val BUBBLE = 0xFFFFFFFF.toInt()
+        const val BUBBLE_TEXT_COLOR = 0xFF23262B.toInt()
 
         const val POCKET_RADIUS = 0.6f
         const val POCKET_TINT = 0.28f

@@ -4,9 +4,10 @@ import android.content.Context
 
 /**
  * Everything the game keeps between launches, in SharedPreferences: the game
- * in progress, the profiles, who last sat where, whether sound is on, and which
- * way the names above the board face. Each encodes to a short string, so there
- * is nothing here worth a database.
+ * in progress, the profiles, who last sat where, whether sound is on, which
+ * way the names above the board face, and whether the board reacts to
+ * captures. Each encodes to a short string, so there is nothing here worth a
+ * database.
  */
 object Saves {
 
@@ -17,6 +18,7 @@ object Saves {
     private const val KEY_LINEUP = "lineup"
     private const val KEY_SOUND = "sound"
     private const val KEY_NAMES_FACE_TABLE = "names_face_table"
+    private const val KEY_REACTIONS = "reactions"
 
     private fun prefs(context: Context) =
         context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
@@ -91,5 +93,11 @@ object Saves {
 
     fun setNamesFaceTable(context: Context, on: Boolean) {
         prefs(context).edit().putBoolean(KEY_NAMES_FACE_TABLE, on).apply()
+    }
+
+    fun reactionsOn(context: Context): Boolean = prefs(context).getBoolean(KEY_REACTIONS, true)
+
+    fun setReactionsOn(context: Context, on: Boolean) {
+        prefs(context).edit().putBoolean(KEY_REACTIONS, on).apply()
     }
 }

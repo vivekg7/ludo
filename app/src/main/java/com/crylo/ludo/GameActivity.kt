@@ -46,6 +46,7 @@ class GameActivity : Activity() {
     private lateinit var confetti: ConfettiView
     private lateinit var soundToggle: TextView
     private lateinit var facingToggle: TextView
+    private lateinit var reactionsToggle: TextView
     private lateinit var sounds: Sounds
 
     /**
@@ -56,6 +57,14 @@ class GameActivity : Activity() {
 
     private val handler = Handler(Looper.getMainLooper())
     private val random = Random.Default
+    private val picker = Picker(random)
+
+    /** Whether captures and tokens home set off emoji and taunts on the board. */
+    private var reactionsOn = true
+
+    // Read once, since each read builds a new array and the picker tells
+    // pools apart by identity.
+    private lateinit var taunts: Map<Capture, Array<String>>
 
     /** True while an animation or a scheduled step owns the turn. */
     private var busy = false
@@ -78,16 +87,26 @@ class GameActivity : Activity() {
         sounds = Sounds()
         sounds.enabled = Saves.soundOn(this)
 
+        reactionsOn = Saves.reactionsOn(this)
+        taunts = mapOf(
+            Capture.CHEAP to resources.getStringArray(R.array.taunts_cheap),
+            Capture.PLAIN to resources.getStringArray(R.array.taunts_plain),
+            Capture.BIG to resources.getStringArray(R.array.taunts_big),
+            Capture.MULTI to resources.getStringArray(R.array.taunts_multi),
+        )
+
         setContentView(buildUi())
         showSoundToggle()
         board.namesFaceTable = Saves.namesFaceTable(this)
         showFacingToggle()
+        showReactionsToggle()
 
         board.onTokenPicked = { token -> play(token) }
         board.onSquareReached = { sounds.play(Sound.STEP) }
-        board.onCapture = {
+        board.onCapture = { token, captured, capturedFrom ->
             sounds.play(Sound.CAPTURE)
             buzz(HapticFeedbackConstants.LONG_PRESS)
+            reactToCapture(Board.owner(token), captured, capturedFrom)
         }
         die.onRollRequested = { roll() }
 
@@ -235,7 +254,10 @@ class GameActivity : Activity() {
 
         // A capture has already sounded through board.onCapture, as its token
         // landed; this runs once the captured tokens are back in their yard.
-        if (move.finished) sounds.play(Sound.HOME)
+        if (move.finished) {
+            sounds.play(Sound.HOME)
+            if (reactionsOn) board.react(Board.owner(move.token), picker.pick(Reactions.cheer))
+        }
 
         hint.text = when {
             move.captured.isNotEmpty() -> getString(R.string.captured)
@@ -250,6 +272,21 @@ class GameActivity : Activity() {
         } else {
             // play() has already passed the dice.
             pauseThenBeginTurn()
+        }
+    }
+
+    /**
+     * The capturing player gloats in their yard and taunts from their name,
+     * and each player who lost a token sulks in theirs. How loud depends on
+     * how much the capture cost. Nothing here holds up the turn.
+     */
+    private fun reactToCapture(attacker: Int, captured: IntArray, capturedFrom: IntArray) {
+        if (!reactionsOn) return
+        val kind = Reactions.capture(captured.size, capturedFrom.max())
+        board.react(attacker, picker.pick(Reactions.gloat.getValue(kind)))
+        board.say(attacker, picker.pick(taunts.getValue(kind)))
+        for (victim in captured.map(Board::owner).distinct()) {
+            board.react(victim, picker.pick(Reactions.sulk.getValue(kind)))
         }
     }
 
@@ -493,18 +530,34 @@ class GameActivity : Activity() {
             bottomMargin = dp(14)
         })
 
-        val bar = LinearLayout(this).apply {
+        // The die sits in the middle of the bar, with the reactions toggle at
+        // its start; the banner row above already has a toggle at each end.
+        val bar = FrameLayout(this)
+        val dice = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
         }
+        bar.addView(dice, FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.CENTER))
+        reactionsToggle = TextView(this).apply {
+            text = "\uD83D\uDCAC" // 💬
+            textSize = 22f
+            gravity = Gravity.CENTER
+            setOnClickListener {
+                reactionsOn = !reactionsOn
+                Saves.setReactionsOn(this@GameActivity, reactionsOn)
+                if (!reactionsOn) board.clearReactions()
+                showReactionsToggle()
+            }
+        }
+        bar.addView(reactionsToggle, FrameLayout.LayoutParams(dp(TOGGLE_DP), dp(TOGGLE_DP), Gravity.START or Gravity.CENTER_VERTICAL))
         die = DieView(this)
-        bar.addView(die, LinearLayout.LayoutParams(dp(76), dp(76)))
+        dice.addView(die, LinearLayout.LayoutParams(dp(76), dp(76)))
 
         showResults = Style.button(this, getString(R.string.show_results), Style.Kind.SECONDARY).apply {
             visibility = View.GONE
             setOnClickListener { openResults() }
         }
-        bar.addView(showResults, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
+        dice.addView(showResults, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
             leftMargin = dp(16)
         })
         root.addView(bar, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
@@ -562,6 +615,12 @@ class GameActivity : Activity() {
             getString(if (board.namesFaceTable) R.string.names_face_holder else R.string.names_face_table)
     }
 
+    private fun showReactionsToggle() {
+        // An emoji cannot be tinted, so off is shown faded.
+        reactionsToggle.alpha = if (reactionsOn) 1f else TOGGLE_OFF_ALPHA
+        reactionsToggle.contentDescription = getString(if (reactionsOn) R.string.reactions_off else R.string.reactions_on)
+    }
+
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
     companion object {
@@ -575,6 +634,7 @@ class GameActivity : Activity() {
         private const val HAND_OVER_MS = 750L
 
         private const val TOGGLE_DP = 48
+        private const val TOGGLE_OFF_ALPHA = 0.35f
 
         private const val WIN_BUZZES = 3
         private const val WIN_BUZZ_GAP_MS = 180L

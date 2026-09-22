@@ -67,4 +67,32 @@
     <string name="names_face_holder">Turn the top names back the right way up</string>
     <string name="mute">Mute sound</string>
     <string name="unmute">Turn sound on</string>
+    <string name="reactions_off">Turn off emoji and taunts</string>
+    <string name="reactions_on">Turn on emoji and taunts</string>
+
+    <!-- Said from the capturing player's name. Short: the bubble is half the board wide. -->
+    <string-array name="taunts_cheap">
+        <item>Barely out the door 🚪</item>
+        <item>Short trip, huh? 😏</item>
+        <item>Straight back in 🤭</item>
+        <item>Not so fast! ✋</item>
+    </string-array>
+    <string-array name="taunts_plain">
+        <item>Back to base 😂</item>
+        <item>Bye bye! 👋</item>
+        <item>Oops, was that yours? 🤭</item>
+        <item>Go home! 🏠</item>
+        <item>Nothing personal 😎</item>
+    </string-array>
+    <string-array name="taunts_big">
+        <item>So close! 😈</item>
+        <item>All that way… 🤣</item>
+        <item>Start again! 😂</item>
+        <item>Not today! 😎</item>
+    </string-array>
+    <string-array name="taunts_multi">
+        <item>Two for one! 🔥</item>
+        <item>Clean sweep 😈</item>
+        <item>Who\'s next? 😎</item>
+    </string-array>
 </resources>
