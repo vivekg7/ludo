@@ -118,8 +118,11 @@ saved game.
   screens so they cannot disagree.
 - **Start counts the players** — "Start game · 3 players" — and is disabled,
   with the reason shown under the rows, until there are at least two.
-- **The grid is the lineup**, so there is no picture of the board above it; an
-  earlier small board drawn over the seat list showed the same thing twice.
+- **A small board above the title shows the lineup** as it will be played,
+  drawn by `BoardView` in its `bare` mode (no name strips, no progress):
+  seated colours with their tokens in the yard, empty ones greyed out as they
+  will be in the game. It is kept small, since the grid below it is where
+  seats are picked.
 - **The ⚙ beside the title opens [Settings](#settings).**
 - The screen scrolls when it does not fit, on a short phone or at a large font
   size, and is centred otherwise.

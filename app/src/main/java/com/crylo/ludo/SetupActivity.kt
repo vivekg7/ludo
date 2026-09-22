@@ -41,6 +41,7 @@ class SetupActivity : Activity() {
     /** The saved game, if there is one, as of the last time this screen came back. */
     private var saved: GameState? = null
 
+    private lateinit var preview: BoardView
     private lateinit var savedSection: View
     private lateinit var savedSummary: TextView
     private lateinit var startButton: Button
@@ -133,6 +134,8 @@ class SetupActivity : Activity() {
         warning.text = if (ready) "" else getString(R.string.need_two_players)
         warning.visibility = if (ready) View.GONE else View.VISIBLE
 
+        // A copy, so the preview's state is not changed under it by the next pick.
+        preview.showState(GameState(seats.copyOf()))
         Saves.saveLineup(this, seats, seatProfiles)
     }
 
@@ -329,6 +332,17 @@ class SetupActivity : Activity() {
             setPadding(dp(20), dp(20), dp(20), dp(20))
         }
 
+        // The lineup drawn as the board it will be played on: seated colours
+        // with their tokens waiting, empty ones greyed out, as in the game.
+        // Kept small: the seat grid below is where the lineup is picked.
+        preview = BoardView(this).apply {
+            bare = true
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }
+        root.addView(preview, LinearLayout.LayoutParams(dp(PREVIEW_DP), dp(PREVIEW_DP)).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+        })
+
         // The title centred, with the settings button at the end of its row,
         // where the game screen has it too.
         val title = FrameLayout(this)
@@ -342,7 +356,7 @@ class SetupActivity : Activity() {
         title.addView(Style.settingsButton(this) {
             startActivity(SettingsActivity.open(this))
         }, FrameLayout.LayoutParams(dp(48), dp(48), Gravity.END or Gravity.CENTER_VERTICAL))
-        root.addView(title, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        root.addView(title, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(8) })
 
         root.addView(TextView(this).apply {
             text = getString(R.string.tagline)
@@ -484,5 +498,7 @@ class SetupActivity : Activity() {
         val BOARD_ROWS = arrayOf(intArrayOf(0, 1), intArrayOf(3, 2))
 
         const val EMPTY_ALPHA = 0.5f
+
+        const val PREVIEW_DP = 112
     }
 }

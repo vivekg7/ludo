@@ -66,6 +66,17 @@ class BoardView(context: Context) : View(context) {
         }
 
     /**
+     * Just the board and its tokens, with no name strips and no progress in the
+     * yards: the setup screen's picture of the lineup. Set before layout.
+     */
+    var bare = false
+        set(value) {
+            field = value
+            requestLayout()
+            invalidate()
+        }
+
+    /**
      * Seat the turn marker points at, or -1 for none. Set by the turn loop
      * rather than read from the state, which passes the dice on before the
      * previous player's token has finished sliding.
@@ -313,18 +324,20 @@ class BoardView(context: Context) : View(context) {
         // The board is always square, with a name strip above and below it;
         // take the largest cell that fits whatever we are given.
         val size = cellFor(MeasureSpec.getSize(widthSpec), MeasureSpec.getSize(heightSpec))
-        setMeasuredDimension((size * Board.GRID).toInt(), (size * TALL_CELLS).toInt())
+        setMeasuredDimension((size * Board.GRID).toInt(), (size * tallCells()).toInt())
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         cell = cellFor(w, h)
-        boardTop = LABEL_CELLS * cell
+        boardTop = if (bare) 0f else LABEL_CELLS * cell
         stroke.strokeWidth = (cell * 0.05f).coerceAtLeast(1f)
         // Ellipsized for the new width on the next draw.
         nameTexts.fill(null)
     }
 
-    private fun cellFor(w: Int, h: Int) = min(w / Board.GRID.toFloat(), h / TALL_CELLS)
+    private fun cellFor(w: Int, h: Int) = min(w / Board.GRID.toFloat(), h / tallCells())
+
+    private fun tallCells() = if (bare) Board.GRID.toFloat() else TALL_CELLS
 
     override fun onDraw(canvas: Canvas) {
         val game = state ?: return
@@ -333,7 +346,7 @@ class BoardView(context: Context) : View(context) {
         layOutTokens(game)
         val now = SystemClock.uptimeMillis()
         expireReactions(now)
-        drawLabels(canvas, game)
+        if (!bare) drawLabels(canvas, game)
 
         canvas.save()
         canvas.translate(0f, boardTop)
@@ -346,9 +359,9 @@ class BoardView(context: Context) : View(context) {
         drawRoutes(canvas, game)
         drawTokens(canvas, game)
         drawLandings(canvas)
-        drawEmojis(canvas, game, now)
+        if (!bare) drawEmojis(canvas, game, now)
         canvas.restore()
-        drawBubbles(canvas, game, now)
+        if (!bare) drawBubbles(canvas, game, now)
     }
 
     /**
@@ -577,6 +590,8 @@ class BoardView(context: Context) : View(context) {
                 canvas.drawRoundRect(rect, cell * 0.35f, cell * 0.35f, fill)
                 continue
             }
+
+            if (bare) continue
 
             // Progress runs along the yard's outer border, the edge beside its
             // name, and faces the same way the name does.
