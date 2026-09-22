@@ -4,7 +4,7 @@ A lightweight, fully offline Ludo game for Android. Pass-and-play with up to
 four people on one device, any seat swappable for a bot, and a profile for each
 person that keeps their wins.
 
-Requires **Android 12 (API 31)** or newer. The signed release APK is **60 KB**.
+Requires **Android 12 (API 31)** or newer. The signed release APK is **62 KB**.
 There are no runtime dependencies beyond the
 Kotlin standard library — no AndroidX, no Compose, no Material. The board and
 die are two custom `View`s drawing on a `Canvas`, the sound effects are
@@ -408,7 +408,7 @@ Estimated at 200–300 lines replacing the current tumble, with no change to
 the APK's size. Breathing, the landing pop and bot rolls carry over.
 
 Rejected: an OpenGL engine (Filament, SceneView) would add several MB to a
-roughly 60 KB APK for one small cube. A physics die bouncing across the
+roughly 62 KB APK for one small cube. A physics die bouncing across the
 board would be much more work, and it cannot easily land on a result chosen
 before the roll.
 
