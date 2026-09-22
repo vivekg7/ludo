@@ -33,6 +33,12 @@ internal object Style {
     private const val RIPPLE_LIGHT = 0x29FFFFFF
     private const val RIPPLE_DARK = 0x29000000
 
+    /** How much of a player's colour fills a taken seat's tile. */
+    private const val TILE_TINT = 0.16f
+
+    /** Opacity of an empty seat's coloured edge, as an ARGB alpha byte. */
+    private const val EMPTY_EDGE = 0x59000000
+
     /** How strongly a button reads: the one thing to do, an alternative, or a way elsewhere. */
     enum class Kind { PRIMARY, SECONDARY, QUIET }
 
@@ -113,6 +119,35 @@ internal object Style {
         contentDescription = context.getString(R.string.settings)
         background = panel(context, Color.TRANSPARENT, radiusDp = 24)
         setOnClickListener { onClick() }
+    }
+
+    /**
+     * A seat on the setup screen, drawn like its yard: edged in the player's
+     * colour and, when someone sits there, tinted with it too. An empty seat
+     * keeps only a faint edge.
+     */
+    fun seatTile(context: Context, color: Int, taken: Boolean): Drawable {
+        val radius = dp(context, 14).toFloat()
+        val shape = GradientDrawable().apply {
+            cornerRadius = radius
+            setColor(if (taken) blend(color, SURFACE, TILE_TINT) else SURFACE)
+            setStroke(dp(context, 2), if (taken) color else (color and 0x00FFFFFF) or EMPTY_EDGE)
+        }
+        val mask = GradientDrawable().apply {
+            cornerRadius = radius
+            setColor(Color.WHITE)
+        }
+        return RippleDrawable(ColorStateList.valueOf(RIPPLE_LIGHT), shape, mask)
+    }
+
+    /** [top] laid over [bottom] at the given opacity, both fully opaque. */
+    fun blend(top: Int, bottom: Int, amount: Float): Int {
+        fun mix(shift: Int): Int {
+            val a = (top shr shift) and 0xFF
+            val b = (bottom shr shift) and 0xFF
+            return ((a * amount + b * (1 - amount)) + 0.5f).toInt() shl shift
+        }
+        return (0xFF shl 24) or mix(16) or mix(8) or mix(0)
     }
 
     /** A small uppercase heading over a group of rows. */

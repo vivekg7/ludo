@@ -31,8 +31,8 @@ class SetupActivity : Activity() {
 
     /** Profile id per seat; only meaningful where the seat is [Seat.HUMAN]. */
     private val seatProfiles = IntArray(Board.PLAYERS)
-    private val seatRows = arrayOfNulls<View>(Board.PLAYERS)
-    private val seatDots = arrayOfNulls<View>(Board.PLAYERS)
+    private val seatTiles = arrayOfNulls<View>(Board.PLAYERS)
+    private val seatColours = arrayOfNulls<TextView>(Board.PLAYERS)
     private val seatTitles = arrayOfNulls<TextView>(Board.PLAYERS)
     private val seatCaptions = arrayOfNulls<TextView>(Board.PLAYERS)
 
@@ -41,7 +41,6 @@ class SetupActivity : Activity() {
     /** The saved game, if there is one, as of the last time this screen came back. */
     private var saved: GameState? = null
 
-    private lateinit var preview: BoardView
     private lateinit var savedSection: View
     private lateinit var savedSummary: TextView
     private lateinit var startButton: Button
@@ -134,15 +133,14 @@ class SetupActivity : Activity() {
         warning.text = if (ready) "" else getString(R.string.need_two_players)
         warning.visibility = if (ready) View.GONE else View.VISIBLE
 
-        // A copy, so the preview's state is not changed under it by the next pick.
-        preview.showState(GameState(seats.copyOf()))
         Saves.saveLineup(this, seats, seatProfiles)
     }
 
     /**
-     * One seat's row: who sits there, and under it the colour and what kind of
-     * seat it is — a profile's record, a guest, a bot, or empty. An empty seat
-     * is dimmed and its dot hollow, so the players stand out at a glance.
+     * One seat's tile: its colour, who sits there, and what kind of seat it is
+     * — a profile's record, a guest, a bot, or empty. A taken seat is tinted
+     * in its colour and an empty one only outlined and dimmed, so the players
+     * stand out at a glance.
      */
     private fun showSeat(player: Int, name: String) {
         val colour = Board.names[player]
@@ -160,16 +158,18 @@ class SetupActivity : Activity() {
             else -> getString(R.string.seat_record, profile.wins, profile.played)
         }
         val taken = seats[player] != Seat.NONE
-        val caption = getString(R.string.seat_caption, colour, detail)
 
         seatTitles[player]?.apply {
             text = title
             setTextColor(if (taken) Style.TEXT else Style.TEXT_DIM)
             typeface = if (taken) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
         }
-        seatCaptions[player]?.text = caption
-        seatDots[player]?.background = Style.seatDot(this, Board.colors[player], taken)
-        seatRows[player]?.contentDescription = getString(R.string.seat_title, colour) + ": " + title + ", " + detail
+        seatCaptions[player]?.text = detail
+        seatColours[player]?.alpha = if (taken) 1f else EMPTY_ALPHA
+        seatTiles[player]?.apply {
+            background = Style.seatTile(this@SetupActivity, Board.colors[player], taken)
+            contentDescription = getString(R.string.seat_title, colour) + ": " + title + ", " + detail
+        }
     }
 
     private fun chooseSeat(player: Int) {
@@ -329,16 +329,6 @@ class SetupActivity : Activity() {
             setPadding(dp(20), dp(20), dp(20), dp(20))
         }
 
-        // The lineup drawn as the board it will be played on: seated colours
-        // with their tokens waiting, empty ones greyed out, as in the game.
-        preview = BoardView(this).apply {
-            bare = true
-            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-        }
-        root.addView(preview, LinearLayout.LayoutParams(dp(PREVIEW_DP), dp(PREVIEW_DP)).apply {
-            gravity = Gravity.CENTER_HORIZONTAL
-        })
-
         // The title centred, with the settings button at the end of its row,
         // where the game screen has it too.
         val title = FrameLayout(this)
@@ -352,7 +342,7 @@ class SetupActivity : Activity() {
         title.addView(Style.settingsButton(this) {
             startActivity(SettingsActivity.open(this))
         }, FrameLayout.LayoutParams(dp(48), dp(48), Gravity.END or Gravity.CENTER_VERTICAL))
-        root.addView(title, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(12) })
+        root.addView(title, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
 
         root.addView(TextView(this).apply {
             text = getString(R.string.tagline)
@@ -365,10 +355,17 @@ class SetupActivity : Activity() {
         root.addView(savedSection, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
 
         root.addView(Style.heading(this, getString(R.string.heading_new)), headingParams())
-        for (player in 0 until Board.PLAYERS) {
-            root.addView(seatRow(player), LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
-                bottomMargin = dp(8)
-            })
+        // Seats laid out as the yards are on the board, so it is plain which
+        // are neighbours and which sit opposite: a list put Red and Green, the
+        // first two, side by side on the board.
+        for (row in BOARD_ROWS) {
+            val line = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            row.forEachIndexed { i, player ->
+                line.addView(seatTile(player), LinearLayout.LayoutParams(0, MATCH_PARENT, 1f).apply {
+                    if (i > 0) leftMargin = dp(8)
+                })
+            }
+            root.addView(line, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dp(8) })
         }
 
         warning = TextView(this).apply {
@@ -434,23 +431,24 @@ class SetupActivity : Activity() {
         return section
     }
 
-    /** A whole-width row per seat; tapping anywhere on it picks who sits there. */
-    private fun seatRow(player: Int): View {
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            background = Style.panel(this@SetupActivity, Style.SURFACE)
-            minimumHeight = dp(64)
-            setPadding(dp(16), dp(10), dp(12), dp(10))
+    /** A seat as a tile, tapped to pick who sits there. Filled in by [showSeat]. */
+    private fun seatTile(player: Int): View {
+        val tile = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            minimumHeight = dp(96)
+            setPadding(dp(14), dp(12), dp(14), dp(12))
             isClickable = true
             isFocusable = true
             setOnClickListener { chooseSeat(player) }
         }
-
-        val dot = View(this)
-        row.addView(dot, LinearLayout.LayoutParams(dp(22), dp(22)))
-
-        val text = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val colour = TextView(this).apply {
+            text = Board.names[player]
+            isAllCaps = true
+            textSize = 12f
+            letterSpacing = 0.08f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Board.colors[player])
+        }
         val title = TextView(this).apply {
             textSize = 17f
             maxLines = 1
@@ -459,25 +457,18 @@ class SetupActivity : Activity() {
         val caption = TextView(this).apply {
             textSize = 13f
             setTextColor(Style.TEXT_DIM)
-            maxLines = 1
+            maxLines = 2
             ellipsize = TextUtils.TruncateAt.END
         }
-        text.addView(title)
-        text.addView(caption)
-        row.addView(text, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f).apply { leftMargin = dp(16) })
+        tile.addView(colour)
+        tile.addView(title, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(6) })
+        tile.addView(caption)
 
-        row.addView(TextView(this).apply {
-            this.text = "\u203A" // ›
-            textSize = 26f
-            setTextColor(Style.TEXT_FAINT)
-            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-        }, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { leftMargin = dp(8) })
-
-        seatRows[player] = row
-        seatDots[player] = dot
+        seatTiles[player] = tile
+        seatColours[player] = colour
         seatTitles[player] = title
         seatCaptions[player] = caption
-        return row
+        return tile
     }
 
     private fun headingParams() = LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
@@ -489,6 +480,9 @@ class SetupActivity : Activity() {
     private fun dp(value: Int) = Style.dp(this, value)
 
     private companion object {
-        const val PREVIEW_DP = 132
+        /** Seats row by row as their yards sit on the board: Red, Green over Blue, Yellow. */
+        val BOARD_ROWS = arrayOf(intArrayOf(0, 1), intArrayOf(3, 2))
+
+        const val EMPTY_ALPHA = 0.5f
     }
 }

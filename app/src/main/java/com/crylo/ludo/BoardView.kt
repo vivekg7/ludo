@@ -66,17 +66,6 @@ class BoardView(context: Context) : View(context) {
         }
 
     /**
-     * Just the board and its tokens, with no name strips and no progress in the
-     * yards: the setup screen's picture of the lineup. Set before layout.
-     */
-    var bare = false
-        set(value) {
-            field = value
-            requestLayout()
-            invalidate()
-        }
-
-    /**
      * Seat the turn marker points at, or -1 for none. Set by the turn loop
      * rather than read from the state, which passes the dice on before the
      * previous player's token has finished sliding.
@@ -324,20 +313,18 @@ class BoardView(context: Context) : View(context) {
         // The board is always square, with a name strip above and below it;
         // take the largest cell that fits whatever we are given.
         val size = cellFor(MeasureSpec.getSize(widthSpec), MeasureSpec.getSize(heightSpec))
-        setMeasuredDimension((size * Board.GRID).toInt(), (size * tallCells()).toInt())
+        setMeasuredDimension((size * Board.GRID).toInt(), (size * TALL_CELLS).toInt())
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         cell = cellFor(w, h)
-        boardTop = if (bare) 0f else LABEL_CELLS * cell
+        boardTop = LABEL_CELLS * cell
         stroke.strokeWidth = (cell * 0.05f).coerceAtLeast(1f)
         // Ellipsized for the new width on the next draw.
         nameTexts.fill(null)
     }
 
-    private fun cellFor(w: Int, h: Int) = min(w / Board.GRID.toFloat(), h / tallCells())
-
-    private fun tallCells() = if (bare) Board.GRID.toFloat() else TALL_CELLS
+    private fun cellFor(w: Int, h: Int) = min(w / Board.GRID.toFloat(), h / TALL_CELLS)
 
     override fun onDraw(canvas: Canvas) {
         val game = state ?: return
@@ -346,7 +333,7 @@ class BoardView(context: Context) : View(context) {
         layOutTokens(game)
         val now = SystemClock.uptimeMillis()
         expireReactions(now)
-        if (!bare) drawLabels(canvas, game)
+        drawLabels(canvas, game)
 
         canvas.save()
         canvas.translate(0f, boardTop)
@@ -359,9 +346,9 @@ class BoardView(context: Context) : View(context) {
         drawRoutes(canvas, game)
         drawTokens(canvas, game)
         drawLandings(canvas)
-        if (!bare) drawEmojis(canvas, game, now)
+        drawEmojis(canvas, game, now)
         canvas.restore()
-        if (!bare) drawBubbles(canvas, game, now)
+        drawBubbles(canvas, game, now)
     }
 
     /**
@@ -575,7 +562,7 @@ class BoardView(context: Context) : View(context) {
             // tokens to come back rather than as empty once they have left.
             stroke.color = Board.colors[player]
             stroke.strokeWidth = cell * 0.09f
-            fill.color = blend(Board.colors[player], PAPER, POCKET_TINT)
+            fill.color = Style.blend(Board.colors[player], PAPER, POCKET_TINT)
             for (slot in 0 until Board.TOKENS_PER_PLAYER) {
                 Board.locate(player, 0, slot, here)
                 canvas.drawCircle(here[0] * cell, here[1] * cell, cell * POCKET_RADIUS, fill)
@@ -590,8 +577,6 @@ class BoardView(context: Context) : View(context) {
                 canvas.drawRoundRect(rect, cell * 0.35f, cell * 0.35f, fill)
                 continue
             }
-
-            if (bare) continue
 
             // Progress runs along the yard's outer border, the edge beside its
             // name, and faces the same way the name does.
@@ -1018,16 +1003,6 @@ class BoardView(context: Context) : View(context) {
             val g = (color shr 8) and 0xFF
             val b = color and 0xFF
             return r * 299 + g * 587 + b * 114 > 160_000
-        }
-
-        /** [top] laid over [bottom] at the given opacity, both fully opaque. */
-        fun blend(top: Int, bottom: Int, amount: Float): Int {
-            fun mix(shift: Int): Int {
-                val a = (top shr shift) and 0xFF
-                val b = (bottom shr shift) and 0xFF
-                return ((a * amount + b * (1 - amount)) + 0.5f).toInt() shl shift
-            }
-            return (0xFF shl 24) or mix(16) or mix(8) or mix(0)
         }
     }
 }

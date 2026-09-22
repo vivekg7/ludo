@@ -106,17 +106,20 @@ saved game.
 - **Starting over asks first.** Starting a new game deletes the save, and Start
   sits right below the card that resumes it, so a save is never lost to one
   tap: Start asks to confirm and names the game it would replace.
-- **Each seat is a whole-width row.** Tapping anywhere on it picks who sits
-  there. The row shows who is seated, with the colour and the kind of seat
-  underneath: a profile's record ("won 4 of 9"), a guest, a bot, or empty. An
-  empty seat is dimmed and its dot is a ring, so the players stand out at a
-  glance. Bots are numbered "Bot 1", "Bot 2" as they are in the game;
-  `Profiles.seatNames` names seats for both screens so they cannot disagree.
+- **The seats are a 2×2 grid laid out like the yards** — Red and Green on top,
+  Blue and Yellow below — so it is plain which seats are neighbours and which
+  sit opposite. A list in colour order made the first two picks Red and Green,
+  side by side on the board, when two players usually want to face each other.
+  Tapping a tile picks who sits there. It shows the colour, who is seated, and
+  the kind of seat: a profile's record ("won 4 of 9"), a guest, a bot, or
+  empty. A taken seat is tinted in its colour; an empty one is only outlined
+  and dimmed, so the players stand out at a glance. Bots are numbered "Bot 1",
+  "Bot 2" as they are in the game; `Profiles.seatNames` names seats for both
+  screens so they cannot disagree.
 - **Start counts the players** — "Start game · 3 players" — and is disabled,
   with the reason shown under the rows, until there are at least two.
-- **The board above is the lineup**, drawn by `BoardView` in its `bare` mode
-  (no name strips, no progress): seated colours with their tokens in the yard,
-  empty ones greyed out as they will be in the game.
+- **The grid is the lineup**, so there is no picture of the board above it; an
+  earlier small board drawn over the seat list showed the same thing twice.
 - **The ⚙ beside the title opens [Settings](#settings).**
 - The screen scrolls when it does not fit, on a short phone or at a large font
   size, and is centred otherwise.
