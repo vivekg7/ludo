@@ -339,13 +339,20 @@ class SetupActivity : Activity() {
             gravity = Gravity.CENTER_HORIZONTAL
         })
 
-        root.addView(TextView(this).apply {
+        // The title centred, with the settings button at the end of its row,
+        // where the game screen has it too.
+        val title = FrameLayout(this)
+        title.addView(TextView(this).apply {
             text = getString(R.string.app_name)
             textSize = 32f
             setTextColor(Style.TEXT)
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
-        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(12) })
+        }, FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.CENTER_VERTICAL))
+        title.addView(Style.settingsButton(this) {
+            startActivity(SettingsActivity.open(this))
+        }, FrameLayout.LayoutParams(dp(48), dp(48), Gravity.END or Gravity.CENTER_VERTICAL))
+        root.addView(title, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(12) })
 
         root.addView(TextView(this).apply {
             text = getString(R.string.tagline)

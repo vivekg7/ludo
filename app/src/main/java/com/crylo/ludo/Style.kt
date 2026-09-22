@@ -10,6 +10,7 @@ import android.graphics.drawable.RippleDrawable
 import android.text.TextUtils
 import android.view.View
 import android.widget.Button
+import android.widget.ImageView
 import android.widget.TextView
 
 /**
@@ -102,6 +103,16 @@ internal object Style {
             setColor(Color.TRANSPARENT)
             setStroke(dp(context, 2), color)
         }
+    }
+
+    /** The cog that opens the settings page, sized to sit at the end of a title row. */
+    fun settingsButton(context: Context, onClick: () -> Unit): View = ImageView(context).apply {
+        setImageResource(R.drawable.ic_settings)
+        imageTintList = ColorStateList.valueOf(TEXT_DIM)
+        scaleType = ImageView.ScaleType.CENTER
+        contentDescription = context.getString(R.string.settings)
+        background = panel(context, Color.TRANSPARENT, radiusDp = 24)
+        setOnClickListener { onClick() }
     }
 
     /** A small uppercase heading over a group of rows. */

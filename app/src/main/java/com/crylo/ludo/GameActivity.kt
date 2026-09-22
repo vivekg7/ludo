@@ -44,9 +44,6 @@ class GameActivity : Activity() {
     private lateinit var results: FrameLayout
     private lateinit var resultsCard: LinearLayout
     private lateinit var confetti: ConfettiView
-    private lateinit var soundToggle: TextView
-    private lateinit var facingToggle: TextView
-    private lateinit var reactionsToggle: TextView
     private lateinit var sounds: Sounds
 
     /**
@@ -59,7 +56,10 @@ class GameActivity : Activity() {
     private val random = Random.Default
     private val picker = Picker(random)
 
-    /** Whether captures and tokens home set off emoji and taunts on the board. */
+    /**
+     * Whether captures and tokens home set off emoji and taunts on the board.
+     * Read with the other settings in [onResume].
+     */
     private var reactionsOn = true
 
     // Read once, since each read builds a new array and the picker tells
@@ -85,9 +85,7 @@ class GameActivity : Activity() {
         names = Profiles.seatNames(state.seats, state.profiles, Saves.profiles(this)) { getString(R.string.bot_name, it) }
 
         sounds = Sounds()
-        sounds.enabled = Saves.soundOn(this)
 
-        reactionsOn = Saves.reactionsOn(this)
         taunts = mapOf(
             Capture.CHEAP to resources.getStringArray(R.array.taunts_cheap),
             Capture.PLAIN to resources.getStringArray(R.array.taunts_plain),
@@ -96,10 +94,6 @@ class GameActivity : Activity() {
         )
 
         setContentView(buildUi())
-        showSoundToggle()
-        board.namesFaceTable = Saves.namesFaceTable(this)
-        showFacingToggle()
-        showReactionsToggle()
 
         board.onTokenPicked = { token -> play(token) }
         board.onSquareReached = { sounds.play(Sound.STEP) }
@@ -446,6 +440,12 @@ class GameActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        // Read here rather than once in onCreate, so what was changed on the
+        // settings page opened from this screen applies on coming back.
+        sounds.enabled = Saves.soundOn(this)
+        board.namesFaceTable = Saves.namesFaceTable(this)
+        reactionsOn = Saves.reactionsOn(this)
+        if (!reactionsOn) board.clearReactions()
         sounds.resume()
     }
 
@@ -476,9 +476,8 @@ class GameActivity : Activity() {
             setPadding(dp(12), dp(20), dp(12), dp(20))
         }
 
-        // The name-facing toggle sits at the start of the banner row and the
-        // sound toggle at the end; the banner is padded by their width on both
-        // sides so the name stays centred.
+        // The settings button sits at the end of the banner row; the banner is
+        // padded by its width on both sides so the name stays centred.
         val header = FrameLayout(this)
         status = TextView(this).apply {
             textSize = 20f
@@ -488,27 +487,9 @@ class GameActivity : Activity() {
             setPadding(dp(TOGGLE_DP), 0, dp(TOGGLE_DP), 0)
         }
         header.addView(status, FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.CENTER_VERTICAL))
-        soundToggle = TextView(this).apply {
-            textSize = 20f
-            gravity = Gravity.CENTER
-            setOnClickListener {
-                sounds.enabled = !sounds.enabled
-                Saves.setSoundOn(this@GameActivity, sounds.enabled)
-                showSoundToggle()
-            }
-        }
-        header.addView(soundToggle, FrameLayout.LayoutParams(dp(TOGGLE_DP), dp(TOGGLE_DP), Gravity.END or Gravity.CENTER_VERTICAL))
-        facingToggle = TextView(this).apply {
-            text = "\u21C5" // ⇅
-            textSize = 24f
-            gravity = Gravity.CENTER
-            setOnClickListener {
-                board.namesFaceTable = !board.namesFaceTable
-                Saves.setNamesFaceTable(this@GameActivity, board.namesFaceTable)
-                showFacingToggle()
-            }
-        }
-        header.addView(facingToggle, FrameLayout.LayoutParams(dp(TOGGLE_DP), dp(TOGGLE_DP), Gravity.START or Gravity.CENTER_VERTICAL))
+        header.addView(Style.settingsButton(this) {
+            startActivity(SettingsActivity.open(this))
+        }, FrameLayout.LayoutParams(dp(TOGGLE_DP), dp(TOGGLE_DP), Gravity.END or Gravity.CENTER_VERTICAL))
         root.addView(header, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
 
         hint = TextView(this).apply {
@@ -530,34 +511,18 @@ class GameActivity : Activity() {
             bottomMargin = dp(14)
         })
 
-        // The die sits in the middle of the bar, with the reactions toggle at
-        // its start; the banner row above already has a toggle at each end.
-        val bar = FrameLayout(this)
-        val dice = LinearLayout(this).apply {
+        val bar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
         }
-        bar.addView(dice, FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.CENTER))
-        reactionsToggle = TextView(this).apply {
-            text = "\uD83D\uDCAC" // 💬
-            textSize = 22f
-            gravity = Gravity.CENTER
-            setOnClickListener {
-                reactionsOn = !reactionsOn
-                Saves.setReactionsOn(this@GameActivity, reactionsOn)
-                if (!reactionsOn) board.clearReactions()
-                showReactionsToggle()
-            }
-        }
-        bar.addView(reactionsToggle, FrameLayout.LayoutParams(dp(TOGGLE_DP), dp(TOGGLE_DP), Gravity.START or Gravity.CENTER_VERTICAL))
         die = DieView(this)
-        dice.addView(die, LinearLayout.LayoutParams(dp(76), dp(76)))
+        bar.addView(die, LinearLayout.LayoutParams(dp(76), dp(76)))
 
         showResults = Style.button(this, getString(R.string.show_results), Style.Kind.SECONDARY).apply {
             visibility = View.GONE
             setOnClickListener { openResults() }
         }
-        dice.addView(showResults, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
+        bar.addView(showResults, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
             leftMargin = dp(16)
         })
         root.addView(bar, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
@@ -604,23 +569,6 @@ class GameActivity : Activity() {
         }
     }
 
-    private fun showSoundToggle() {
-        soundToggle.text = if (sounds.enabled) "\uD83D\uDD0A" else "\uD83D\uDD07" // 🔊 / 🔇
-        soundToggle.contentDescription = getString(if (sounds.enabled) R.string.mute else R.string.unmute)
-    }
-
-    private fun showFacingToggle() {
-        facingToggle.setTextColor(if (board.namesFaceTable) ACCENT else TOGGLE_OFF)
-        facingToggle.contentDescription =
-            getString(if (board.namesFaceTable) R.string.names_face_holder else R.string.names_face_table)
-    }
-
-    private fun showReactionsToggle() {
-        // An emoji cannot be tinted, so off is shown faded.
-        reactionsToggle.alpha = if (reactionsOn) 1f else TOGGLE_OFF_ALPHA
-        reactionsToggle.contentDescription = getString(if (reactionsOn) R.string.reactions_off else R.string.reactions_on)
-    }
-
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
     companion object {
@@ -634,7 +582,6 @@ class GameActivity : Activity() {
         private const val HAND_OVER_MS = 750L
 
         private const val TOGGLE_DP = 48
-        private const val TOGGLE_OFF_ALPHA = 0.35f
 
         private const val WIN_BUZZES = 3
         private const val WIN_BUZZ_GAP_MS = 180L
@@ -642,8 +589,6 @@ class GameActivity : Activity() {
         private const val SCRIM = 0xB3000000.toInt()
 
         private const val BACKGROUND = 0xFF12161C.toInt()
-        private const val ACCENT = 0xFFFFB300.toInt()
-        private const val TOGGLE_OFF = 0xFF6B7380.toInt()
 
         fun newGame(context: Context, seats: Array<Seat>, profiles: IntArray): Intent =
             Intent(context, GameActivity::class.java)

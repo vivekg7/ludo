@@ -117,6 +117,7 @@ saved game.
 - **The board above is the lineup**, drawn by `BoardView` in its `bare` mode
   (no name strips, no progress): seated colours with their tokens in the yard,
   empty ones greyed out as they will be in the game.
+- **The ⚙ beside the title opens [Settings](#settings).**
 - The screen scrolls when it does not fit, on a short phone or at a large font
   size, and is centred otherwise.
 
@@ -179,11 +180,12 @@ board; it is white on red, green and blue, and dark on yellow.
 - **Progress counts what is drawn, not the state.** For the same reason, the
   percentage is taken from where each token is on screen, so it ticks up as a
   token walks and down as a captured one is walked home.
-- **The ⇅ button turns the top two names and progress upside down**, to face the
-  players at
-  the far end of a phone lying flat on the table. It is off by default, because
-  a phone passed from hand to hand is always read from the bottom, and the choice
-  is remembered like mute.
+- **The only control beside the banner is ⚙**, which opens
+  [Settings](#settings) over the game. Sound, the reactions and the name facing
+  once had a button each round the board; they are changed rarely enough that
+  one way in keeps the game screen to the banner, the board and the die, but
+  can matter mid-game (a phone call, the phone turned round on the table), so
+  the settings open from here too rather than only from the setup screen.
 - **Yards have a pocket per token**, so a yard whose tokens are out reads as
   waiting for them, not as blank.
 - **An arrow in each colour** sits on the last ring square before that colour's
@@ -233,10 +235,9 @@ board; it is white on red, green and blue, and dark on yellow.
     Picks are random but never repeat the last from the same pool, so a long
     game does not keep saying the same thing.
   - _Out of the way._ Reactions last about two seconds and never hold up the
-    turn. The emoji follow the ⇅ setting like the names, and with animations
-    turned off they show still instead of popping. The 💬 button at the left
-    end of the die's row turns them off, and the choice is remembered like
-    mute.
+    turn. The emoji follow the name facing setting like the names, and with
+    animations turned off they show still instead of popping. They can be
+    turned off in Settings.
   - _From moves only._ A reaction is set off by a move as it lands, so a game
     resumed or rebuilt after a rotation gets them for every move played from
     then on, but does not replay one for a capture that happened before.
@@ -256,13 +257,29 @@ board; it is white on red, green and blue, and dark on yellow.
   follows the system's touch-feedback setting, so it is off for anyone who has
   turned that off. Sixes a bot rolls do not vibrate, since nobody rolled them.
 
+## Settings
+
+Opened by the ⚙ on the setup screen and on the game screen, and kept in
+`Saves` like the rest:
+
+- **Sound**, on by default.
+- **Emoji and taunts**, the reactions to a capture or a token home; on by
+  default.
+- **Top names face the far side**, which turns the top two names and progress
+  upside down to face the players at the far end of a phone lying flat on the
+  table. Off by default, because a phone passed from hand to hand is always
+  read from the bottom.
+
+Each switch saves as it is flipped, so leaving with Back loses nothing. The
+game screen reads all three in `onResume`, so what is changed on the settings
+page opened from a game applies as soon as it comes back.
+
 ## Sound
 
 The game screen plays a rattle and a thud for each roll, a tap for every square
 a token walks, a falling slide for a capture, a chime for a token reaching
 home, a low two-note "womp" for a roll that cannot be played, and a fanfare for
-the win. The speaker button next to the turn banner mutes them, and the choice
-is remembered across games.
+the win. They can be turned off in [Settings](#settings).
 
 - **No audio files.** `Sounds` renders every effect into PCM from sine tones,
   pitch sweeps and short noise bursts when the game screen opens. The whole
@@ -311,22 +328,23 @@ cannot be captured, so those tokens can never collide with anything.
 
 ## Layout
 
-| File               | What it does                                                     |
-| ------------------ | ---------------------------------------------------------------- |
-| `Board.kt`         | Board geometry: the ring, home runs, yards, safe squares         |
-| `Game.kt`          | `GameState`, its save encoding, and `Rules` — the whole variant  |
-| `Profile.kt`       | Profiles: names, win records, and their save encoding            |
-| `Bot.kt`           | One-ply heuristic opponent                                       |
-| `BoardView.kt`     | Draws the board, tokens and seat names; turns taps into choices  |
-| `Reactions.kt`     | Which emoji and taunts a capture or a token home sets off        |
-| `DieView.kt`       | The die, and its tumble animation                                |
-| `ConfettiView.kt`  | The confetti over the results of a won game                      |
-| `Style.kt`         | Colours, buttons and panels shared by both screens               |
-| `Sounds.kt`        | Synthesises and plays the sound effects                          |
-| `GameActivity.kt`  | The turn loop, and the results of a won game                     |
-| `SetupActivity.kt` | Seat picker, profile leaderboard and resume                      |
-| `Saves.kt`         | Saved game, profiles, lineup and the toggles (preferences)       |
-| `Insets.kt`        | Keeps content clear of the system bars under forced edge-to-edge |
+| File                  | What it does                                                     |
+| --------------------- | ---------------------------------------------------------------- |
+| `Board.kt`            | Board geometry: the ring, home runs, yards, safe squares         |
+| `Game.kt`             | `GameState`, its save encoding, and `Rules` — the whole variant  |
+| `Profile.kt`          | Profiles: names, win records, and their save encoding            |
+| `Bot.kt`              | One-ply heuristic opponent                                       |
+| `BoardView.kt`        | Draws the board, tokens and seat names; turns taps into choices  |
+| `Reactions.kt`        | Which emoji and taunts a capture or a token home sets off        |
+| `DieView.kt`          | The die, and its tumble animation                                |
+| `ConfettiView.kt`     | The confetti over the results of a won game                      |
+| `Style.kt`            | Colours, buttons and panels shared by the screens                |
+| `Sounds.kt`           | Synthesises and plays the sound effects                          |
+| `GameActivity.kt`     | The turn loop, and the results of a won game                     |
+| `SettingsActivity.kt` | The settings page: sound, reactions, name facing                 |
+| `SetupActivity.kt`    | Seat picker, profile leaderboard and resume                      |
+| `Saves.kt`            | Saved game, profiles, lineup and settings (preferences)          |
+| `Insets.kt`           | Keeps content clear of the system bars under forced edge-to-edge |
 
 `Game.kt`, `Board.kt`, `Profile.kt` and `Reactions.kt` touch no Android APIs,
 so the rules, the profile records and the reaction picks are exercised from
