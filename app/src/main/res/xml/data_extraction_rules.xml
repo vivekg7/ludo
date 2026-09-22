@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What leaves the device, on Android 12 and up (the minimum here).
+
+     Moving to a new phone brings the preferences along: the profiles and
+     their records, the saved game, the lineup and the settings. Those are
+     the family's history with the game, and losing them to a phone upgrade
+     would be the one thing worth backing up.
+
+     Nothing goes to cloud backup. The app makes no network requests and
+     has no account, and a cloud copy restored onto a phone later would
+     bring back a stale saved game along with the records. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="sharedpref" path="." />
+    </device-transfer>
+</data-extraction-rules>

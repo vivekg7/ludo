@@ -281,6 +281,18 @@ Each switch saves as it is flipped, so leaving with Back loses nothing. The
 game screen reads all three in `onResume`, so what is changed on the settings
 page opened from a game applies as soon as it comes back.
 
+## Backup
+
+Moving to a new phone brings the game along: Android's device-to-device
+transfer copies the preferences, which hold the profiles and their records, the
+saved game, the lineup and the settings. Nothing goes to cloud backup — the app
+opens no sockets and has no account, and a cloud copy restored later would
+bring back a stale saved game with the records.
+
+The rules are in `res/xml/data_extraction_rules.xml`. The older
+`fullBackupContent` attribute is not set: on Android 12 and up, the minimum
+here, `dataExtractionRules` replaces it.
+
 ## Sound
 
 The game screen plays a rattle and a thud for each roll, a tap for every square
