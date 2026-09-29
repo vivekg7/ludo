@@ -126,6 +126,21 @@ class RulesTest {
     }
 
     @Test
+    fun `tokens stacked on one square leave nothing to choose`() {
+        val state = soloVsGreen()
+        state.steps[0] = 10
+        state.steps[1] = 10
+        assertTrue(Rules.isForced(state, Rules.legalMoves(state, 3)))
+        // A six also frees a yard token, which lands somewhere else.
+        assertFalse(Rules.isForced(state, Rules.legalMoves(state, 6)))
+        state.steps[1] = 12
+        assertFalse(Rules.isForced(state, Rules.legalMoves(state, 3)))
+        // Four yard tokens on a six all come out onto the same start cell.
+        assertTrue(Rules.isForced(soloVsGreen(), Rules.legalMoves(soloVsGreen(), 6)))
+        assertFalse(Rules.isForced(state, IntArray(0)))
+    }
+
+    @Test
     fun `landing on an enemy off a safe square sends it home`() {
         val state = soloVsGreen()
         state.steps[0] = 1                       // red on ring index 1

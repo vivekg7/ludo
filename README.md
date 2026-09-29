@@ -222,6 +222,10 @@ board; it is white on red, green and blue, and dark on yellow.
   tumble picked each face at random and swapped in the result only when the
   animation ended, so the die looked settled on one number and then jumped to
   another.
+- **A roll with nothing to decide plays itself.** When only one token can move,
+  or every token that can move stands on the same square — a stack, or a full
+  yard on a six — it moves without a tap. Which token of a stack goes makes no
+  difference to the game, so asking would only slow it down (`Rules.isForced`).
 - **Picking a token previews where each one lands**: a faint ring on the square,
   or a faint ticked ring round the token that move would capture, with a faint
   dotted line along the squares on the way. A token leaving its yard gets no

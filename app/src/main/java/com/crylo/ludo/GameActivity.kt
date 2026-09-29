@@ -189,8 +189,9 @@ class GameActivity : Activity() {
             }
 
             // With a single option there is nothing to decide, so play it
-            // rather than making the player tap the only legal token.
-            moves.size == 1 || bot -> {
+            // rather than making the player tap the only legal token. Tokens
+            // stacked on one square are a single option too.
+            Rules.isForced(state, moves) || bot -> {
                 val token = if (bot) Bot.chooseMove(state, face, moves, random) else moves[0]
                 busy = true
                 handler.postDelayed({ busy = false; play(token) }, if (bot) BOT_THINK_MS else AUTO_MOVE_MS)

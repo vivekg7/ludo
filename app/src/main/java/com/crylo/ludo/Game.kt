@@ -145,6 +145,14 @@ object Rules {
         return buffer.copyOf(count)
     }
 
+    /**
+     * Whether [moves] leave nothing to decide: every token that can move
+     * stands on the same square, so whichever is picked lands in the same
+     * place with the same outcome. Tokens in the yard count as one square.
+     */
+    fun isForced(state: GameState, moves: IntArray): Boolean =
+        moves.isNotEmpty() && moves.all { state.steps[it] == state.steps[moves[0]] }
+
     /** Applies a legal move in place and reports what it did. */
     fun apply(state: GameState, token: Int, die: Int): Move {
         val player = Board.owner(token)
