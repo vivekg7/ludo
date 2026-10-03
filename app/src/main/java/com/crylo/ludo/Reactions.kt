@@ -6,9 +6,10 @@ import kotlin.random.Random
 enum class Capture { CHEAP, PLAIN, BIG, MULTI }
 
 /**
- * What the yards and names say about a capture or a token getting home: the
- * emoji and which pool of taunts. Pure, like [Rules], so it is testable off
- * the device; the taunt lines themselves are string arrays, to be translated.
+ * What the yards and names say about a capture or a token getting home, and
+ * the tokens about a ladder or a snake: the emoji and which pool of taunts.
+ * Pure, like [Rules], so it is testable off the device; the taunt lines
+ * themselves are string arrays, to be translated.
  */
 object Reactions {
 
@@ -44,6 +45,12 @@ object Reactions {
 
     /** Shown in a player's yard when one of their tokens gets home. */
     val cheer = arrayOf("🥳", "🎉", "🙌", "😎", "💃")
+
+    /** Shown over a token that has just climbed a ladder. */
+    val ladder = arrayOf("🥳", "🙌", "😎", "🚀", "🤩")
+
+    /** Shown over a token that has just been sent down a snake. */
+    val snake = arrayOf("😱", "😭", "🐍", "😫", "💀")
 }
 
 /**

@@ -1,7 +1,5 @@
 package com.crylo.ludo
 
-import kotlin.random.Random
-
 /** Who is sitting in one of the four seats. */
 enum class Seat { NONE, HUMAN, BOT }
 
@@ -16,29 +14,20 @@ class Move(
 )
 
 /**
- * The entire game. Small enough to copy, serialise and hand around whole,
- * which is what keeps saving a game to SharedPreferences a one-liner.
+ * A game of Ludo: the shared [Match] plus where all sixteen tokens are. Small
+ * enough to copy, serialise and hand around whole, which is what keeps saving
+ * a game to SharedPreferences a one-liner.
  */
-class GameState(val seats: Array<Seat>) {
+class GameState(seats: Array<Seat>) : Match(seats) {
 
-    /** Profile id per seat, or [Profiles.NONE] for a guest, a bot or an empty seat. */
-    val profiles = IntArray(Board.PLAYERS)
+    override val kind = GameKind.LUDO
 
     /** Position of all sixteen tokens, indexed player * 4 + slot. See [Board]. */
     val steps = IntArray(Board.TOKENS)
 
-    var current = seats.indexOfFirst { it != Seat.NONE }.coerceAtLeast(0)
-
-    /** Current face, or 0 when the player still has to roll. */
-    var die = 0
-
-    /** Consecutive sixes this turn; three in a row forfeits it. */
-    var sixStreak = 0
-
-    /** Player who has all four tokens home, or -1 while the game is running. */
-    var winner = -1
-
-    fun isBot(player: Int) = seats[player] == Seat.BOT
+    override val positions get() = steps
+    override val positionRange get() = 0..Board.FINISH
+    override val saveVersion get() = SAVE_VERSION
 
     /** Steps [player]'s four tokens have walked between them, out of 4 × [Board.FINISH]. */
     fun travelled(player: Int): Int {
@@ -52,58 +41,22 @@ class GameState(val seats: Array<Seat>) {
         return (first until first + Board.TOKENS_PER_PLAYER).count { steps[it] == Board.FINISH }
     }
 
-    fun encode(): String = buildString {
-        append(SAVE_VERSION).append('|')
-        seats.joinTo(this, ",") { it.ordinal.toString() }
-        append('|')
-        steps.joinTo(this, ",")
-        append('|').append(current)
-        append('|').append(die)
-        append('|').append(sixStreak)
-        append('|').append(winner)
-        append('|')
-        profiles.joinTo(this, ",")
-    }
+    /** Tokens home first, then ground covered, which is always less than one more token home. */
+    override fun score(player: Int) =
+        tokensHome(player) * (Board.TOKENS_PER_PLAYER * Board.FINISH + 1) + travelled(player)
+
+    override fun percent(player: Int) = Board.travelPercent(travelled(player))
 
     companion object {
         private const val SAVE_VERSION = 2
 
-        fun decode(saved: String?): GameState? {
-            val parts = saved?.split('|') ?: return null
-            // Version 1 predates profiles and is otherwise identical, so a game
-            // left in progress across the update still resumes, with guests.
-            val fields = when (parts[0].toIntOrNull()) {
-                1 -> 7
-                SAVE_VERSION -> 8
-                else -> return null
-            }
-            if (parts.size != fields) return null
-            return try {
-                val seats = parts[1].split(',').map { Seat.entries[it.toInt()] }.toTypedArray()
-                val positions = parts[2].split(',').map { it.toInt() }
-                if (seats.size != Board.PLAYERS || positions.size != Board.TOKENS) return null
-                if (seats.count { it != Seat.NONE } < 2) return null
-                if (positions.any { it !in 0..Board.FINISH }) return null
-
-                GameState(seats).apply {
-                    positions.forEachIndexed { i, v -> steps[i] = v }
-                    current = parts[3].toInt().coerceIn(0, Board.PLAYERS - 1)
-                    die = parts[4].toInt().coerceIn(0, 6)
-                    sixStreak = parts[5].toInt().coerceIn(0, 2)
-                    winner = parts[6].toInt().let { if (it in 0 until Board.PLAYERS) it else -1 }
-                    if (seats[current] == Seat.NONE) current = seats.indexOfFirst { it != Seat.NONE }
-                    if (fields == 8) {
-                        val ids = parts[7].split(',').map { it.toInt() }
-                        if (ids.size != Board.PLAYERS) return null
-                        for (p in 0 until Board.PLAYERS) {
-                            profiles[p] = if (seats[p] == Seat.HUMAN && ids[p] > 0) ids[p] else Profiles.NONE
-                        }
-                    }
-                }
-            } catch (e: RuntimeException) {
-                // A corrupt or older save is not worth crashing over; the
-                // caller just starts a fresh game instead.
-                null
+        // Version 1 predates profiles and is otherwise identical, so a game
+        // left in progress across that update still resumes, with guests.
+        fun decode(saved: String?): GameState? = Match.decode(saved, ::GameState) {
+            when (it) {
+                1 -> Match.FIELDS - 1
+                SAVE_VERSION -> Match.FIELDS
+                else -> null
             }
         }
     }
@@ -119,8 +72,6 @@ class GameState(val seats: Array<Seat>) {
  * an exact roll.
  */
 object Rules {
-
-    const val SIX_STREAK_LIMIT = 3
 
     private val EMPTY = IntArray(0)
 
@@ -206,58 +157,12 @@ object Rules {
     }
 
     /**
-     * Hands the first roll of a new game to an occupied seat chosen at random.
-     * Going first is a small edge in Ludo, and without this it would always
-     * fall to whoever sits in the lowest seat.
-     */
-    fun pickStarter(state: GameState, random: Random) {
-        val occupied = state.seats.indices.filter { state.seats[it] != Seat.NONE }
-        state.current = occupied[random.nextInt(occupied.size)]
-    }
-
-    /**
-     * Occupied seats in finishing order: the winner, if there is one, then the
-     * rest by tokens home and then by ground covered. Seat order breaks a tie,
-     * which [sameStanding] lets a caller show as a shared place.
-     */
-    fun standings(state: GameState): IntArray =
-        (0 until Board.PLAYERS)
-            .filter { state.seats[it] != Seat.NONE }
-            .sortedWith(
-                compareByDescending<Int> { it == state.winner }
-                    .thenByDescending { state.tokensHome(it) }
-                    .thenByDescending { state.travelled(it) },
-            )
-            .toIntArray()
-
-    /** Whether two players are level: neither has won, and they are equally far along. */
-    fun sameStanding(state: GameState, a: Int, b: Int): Boolean =
-        a != state.winner && b != state.winner &&
-            state.tokensHome(a) == state.tokensHome(b) && state.travelled(a) == state.travelled(b)
-
-    /** Next occupied seat clockwise. */
-    fun nextPlayer(state: GameState): Int {
-        var p = state.current
-        do {
-            p = (p + 1) % Board.PLAYERS
-        } while (state.seats[p] == Seat.NONE)
-        return p
-    }
-
-    /**
      * Finishes the turn a move from [apply] leaves open: the same player rolls
      * again after an extra turn, otherwise the dice pass on. A won game is
      * left as it is.
      */
     fun settle(state: GameState, move: Move) {
         if (state.winner >= 0) return
-        if (move.extraTurn) state.die = 0 else passTurn(state)
-    }
-
-    /** Hands the dice on and clears the per-turn state. */
-    fun passTurn(state: GameState) {
-        state.current = nextPlayer(state)
-        state.die = 0
-        state.sixStreak = 0
+        if (move.extraTurn) state.die = 0 else Turns.passTurn(state)
     }
 }

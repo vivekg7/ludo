@@ -255,12 +255,12 @@ class RulesTest {
         state.die = 6
         state.sixStreak = 2
 
-        Rules.passTurn(state)
+        Turns.passTurn(state)
         assertEquals(2, state.current)
         assertEquals(0, state.die)
         assertEquals(0, state.sixStreak)
 
-        Rules.passTurn(state)
+        Turns.passTurn(state)
         assertEquals(0, state.current)
     }
 
@@ -270,7 +270,7 @@ class RulesTest {
         val random = kotlin.random.Random(3)
         val starts = IntArray(Board.PLAYERS)
         repeat(1000) {
-            Rules.pickStarter(state, random)
+            Turns.pickStarter(state, random)
             starts[state.current]++
         }
         assertEquals(0, starts[0])
@@ -284,14 +284,14 @@ class RulesTest {
         state.steps[Board.firstToken(0)] = 40                          // red: far, none home
         state.steps[Board.firstToken(1)] = Board.FINISH                // green: one home
         state.steps[Board.firstToken(3)] = 40                          // blue: level with red
-        assertArrayEquals(intArrayOf(1, 0, 3), Rules.standings(state))
-        assertTrue(Rules.sameStanding(state, 0, 3))
-        assertFalse(Rules.sameStanding(state, 0, 1))
+        assertArrayEquals(intArrayOf(1, 0, 3), state.standings())
+        assertTrue(state.sameStanding(0, 3))
+        assertFalse(state.sameStanding(0, 1))
 
         for (t in 0 until Board.TOKENS_PER_PLAYER) state.steps[Board.firstToken(3) + t] = Board.FINISH
         state.winner = 3
-        assertArrayEquals(intArrayOf(3, 1, 0), Rules.standings(state))
-        assertFalse(Rules.sameStanding(state, 3, 3))
+        assertArrayEquals(intArrayOf(3, 1, 0), state.standings())
+        assertFalse(state.sameStanding(3, 3))
     }
 }
 
@@ -377,20 +377,33 @@ class BotTest {
 
 class ProfileTest {
 
-    private val family = listOf(Profile(1, "Mum", 5, 2), Profile(2, "Dad"), Profile(3, "Asha", 1, 1))
+    private val family = listOf(
+        Profile(1, "Mum", Record(5, 2)),
+        Profile(2, "Dad"),
+        Profile(3, "Asha", Record(1, 1), Record(4, 3)),
+    )
 
     @Test
     fun `profiles survive a round trip, commas in names included`() {
-        val profiles = family + Profile(7, "Nani, the champ", 12, 9)
+        val profiles = family + Profile(7, "Nani, the champ", Record(12, 9), Record(2, 0))
         assertEquals(profiles, Profiles.decode(Profiles.encode(profiles)))
         assertEquals(emptyList<Profile>(), Profiles.decode(Profiles.encode(emptyList())))
     }
 
     @Test
     fun `a damaged line loses only that profile`() {
-        val saved = "1,5,2,Mum\nnonsense\n0,0,0,Nobody\n2,x,0,Dad\n3,1,1,Asha\n3,0,0,Dup"
-        assertEquals(listOf(Profile(1, "Mum", 5, 2), Profile(3, "Asha", 1, 1)), Profiles.decode(saved))
+        val saved = "#2\n1,5,2,0,0,Mum\nnonsense\n0,0,0,0,0,Nobody\n2,x,0,0,0,Dad\n3,1,1,4,3,Asha\n3,0,0,0,0,Dup"
+        assertEquals(listOf(family[0], family[2]), Profiles.decode(saved))
         assertEquals(emptyList<Profile>(), Profiles.decode(null))
+    }
+
+    @Test
+    fun `records saved before a second game came are Ludo records`() {
+        val saved = "1,5,2,Mum\n7,12,9,Nani, the champ"
+        assertEquals(
+            listOf(Profile(1, "Mum", Record(5, 2)), Profile(7, "Nani, the champ", Record(12, 9))),
+            Profiles.decode(saved),
+        )
     }
 
     @Test
@@ -412,9 +425,21 @@ class ProfileTest {
         state.winner = 2
 
         val updated = Profiles.recordGame(family, state)
-        assertEquals(Profile(1, "Mum", 6, 2), updated[0])
+        assertEquals(Profile(1, "Mum", Record(6, 2)), updated[0])
         assertEquals(Profile(2, "Dad"), updated[1])          // not playing
-        assertEquals(Profile(3, "Asha", 2, 2), updated[2])
+        assertEquals(Profile(3, "Asha", Record(2, 2), Record(4, 3)), updated[2])
+    }
+
+    @Test
+    fun `a game is credited to its own game's record`() {
+        val state = SnakesState(arrayOf(Seat.HUMAN, Seat.HUMAN, Seat.NONE, Seat.NONE))
+        state.profiles[0] = 1
+        state.profiles[1] = 3
+        state.winner = 0
+
+        val updated = Profiles.recordGame(family, state)
+        assertEquals(Profile(1, "Mum", Record(5, 2), Record(1, 1)), updated[0])
+        assertEquals(Profile(3, "Asha", Record(1, 1), Record(5, 3)), updated[2])
     }
 
     @Test
@@ -424,7 +449,7 @@ class ProfileTest {
         assertEquals(family, Profiles.recordGame(family, state))
 
         state.winner = 1
-        assertEquals(Profile(1, "Mum", 6, 2), Profiles.recordGame(family, state)[0])
+        assertEquals(Profile(1, "Mum", Record(6, 2)), Profiles.recordGame(family, state)[0])
     }
 
     @Test
@@ -435,11 +460,16 @@ class ProfileTest {
 
     @Test
     fun `ranking is by wins, then fewer games, then name`() {
-        val profiles = family + Profile(4, "bina", 1, 1) + Profile(5, "Zoya", 9, 2)
-        assertEquals(listOf("Mum", "Zoya", "Asha", "bina", "Dad"), Profiles.ranked(profiles).map { it.name })
-        assertEquals(40, Profiles.winPercent(family[0]))
-        assertEquals(0, Profiles.winPercent(family[1]))
-        assertEquals(66, Profiles.winPercent(Profile(9, "Ravi", 3, 2)))
+        val profiles = family + Profile(4, "bina", Record(1, 1)) + Profile(5, "Zoya", Record(9, 2))
+        assertEquals(
+            listOf("Mum", "Zoya", "Asha", "bina", "Dad"),
+            Profiles.ranked(profiles, GameKind.LUDO).map { it.name },
+        )
+        // Each game ranks by its own record.
+        assertEquals("Asha", Profiles.ranked(profiles, GameKind.SNAKES).first().name)
+        assertEquals(40, Profiles.winPercent(family[0].ludo))
+        assertEquals(0, Profiles.winPercent(family[1].ludo))
+        assertEquals(66, Profiles.winPercent(Record(3, 2)))
     }
 
     @Test

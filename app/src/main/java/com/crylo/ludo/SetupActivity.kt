@@ -2,6 +2,7 @@ package com.crylo.ludo
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
 import android.text.InputFilter
@@ -22,8 +23,8 @@ import android.widget.ScrollView
 import android.widget.TextView
 
 /**
- * Seat picker: who is playing which colour, the profiles they play as, and a
- * way back into a saved game.
+ * Game and seat picker: which game, who is playing which colour, the profiles
+ * they play as, and a way back into that game's saved game.
  */
 class SetupActivity : Activity() {
 
@@ -38,10 +39,15 @@ class SetupActivity : Activity() {
 
     private var profiles = emptyList<Profile>()
 
-    /** The saved game, if there is one, as of the last time this screen came back. */
-    private var saved: GameState? = null
+    /** The game picked; the saved game, the records and the preview are all this game's. */
+    private var kind = GameKind.LUDO
+
+    /** The picked game's saved game, if there is one, as of the last time this screen came back. */
+    private var saved: Match? = null
 
     private lateinit var preview: BoardView
+    private lateinit var snakesPreview: SnakesBoardView
+    private val kindButtons = HashMap<GameKind, Button>()
     private lateinit var savedSection: View
     private lateinit var savedSummary: TextView
     private lateinit var startButton: Button
@@ -50,6 +56,7 @@ class SetupActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Saves.loadLineup(this, seats, seatProfiles)
+        kind = Saves.kind(this)
         setContentView(buildUi())
     }
 
@@ -58,7 +65,28 @@ class SetupActivity : Activity() {
         // The saved game may have been finished or abandoned since we last
         // looked, and a finished game has changed the profiles' records.
         profiles = Saves.profiles(this)
-        saved = Saves.load(this)
+        refreshKind()
+    }
+
+    private fun pick(picked: GameKind) {
+        if (picked == kind) return
+        kind = picked
+        Saves.setKind(this, picked)
+        refreshKind()
+    }
+
+    /** Shows everything for the picked game: its button, its saved game, its records and its board. */
+    private fun refreshKind() {
+        for ((each, button) in kindButtons) {
+            val chosen = each == kind
+            button.isSelected = chosen
+            button.background = Style.panel(this, if (chosen) Style.SURFACE else Color.TRANSPARENT, if (chosen) Style.ACCENT else Style.OUTLINE)
+            button.setTextColor(if (chosen) Style.TEXT else Style.TEXT_DIM)
+            button.typeface = if (chosen) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+        }
+        preview.visibility = if (kind == GameKind.LUDO) View.VISIBLE else View.GONE
+        snakesPreview.visibility = if (kind == GameKind.SNAKES) View.VISIBLE else View.GONE
+        saved = Saves.load(this, kind)
         refreshSaved()
         refreshSeats()
     }
@@ -81,8 +109,8 @@ class SetupActivity : Activity() {
     }
 
     private fun startNewGame() {
-        Saves.clear(this)
-        startActivity(GameActivity.newGame(this, seats, seatProfiles))
+        Saves.clear(this, kind)
+        startActivity(GameActivity.newGame(this, kind, seats, seatProfiles))
     }
 
     // --- saved game --------------------------------------------------------
@@ -99,10 +127,10 @@ class SetupActivity : Activity() {
     }
 
     /** "Vivek 34% · Jyoti 21% · Bot 1 12%", leader first. */
-    private fun summaryOf(game: GameState): String {
+    private fun summaryOf(game: Match): String {
         val names = Profiles.seatNames(game.seats, game.profiles, profiles) { getString(R.string.bot_name, it) }
-        return Rules.standings(game).joinToString(" · ") { player ->
-            getString(R.string.saved_player, names[player], Board.travelPercent(game.travelled(player)))
+        return game.standings().joinToString(" · ") { player ->
+            getString(R.string.saved_player, names[player], game.percent(player))
         }
     }
 
@@ -136,6 +164,7 @@ class SetupActivity : Activity() {
 
         // A copy, so the preview's state is not changed under it by the next pick.
         preview.showState(GameState(seats.copyOf()))
+        snakesPreview.showState(SnakesState(seats.copyOf()))
         Saves.saveLineup(this, seats, seatProfiles)
     }
 
@@ -148,6 +177,7 @@ class SetupActivity : Activity() {
     private fun showSeat(player: Int, name: String) {
         val colour = Board.names[player]
         val profile = profiles.firstOrNull { it.id == seatProfiles[player] }
+        val record = profile?.record(kind)
         val title = when (seats[player]) {
             Seat.HUMAN -> profile?.name ?: getString(R.string.seat_guest)
             Seat.BOT -> name
@@ -156,9 +186,9 @@ class SetupActivity : Activity() {
         val detail = when {
             seats[player] == Seat.BOT -> getString(R.string.seat_bot_caption)
             seats[player] == Seat.NONE -> getString(R.string.seat_off_caption)
-            profile == null -> getString(R.string.seat_guest_caption)
-            profile.played == 0 -> getString(R.string.seat_no_games)
-            else -> getString(R.string.record, profile.wins, profile.played)
+            record == null -> getString(R.string.seat_guest_caption)
+            record.played == 0 -> getString(R.string.seat_no_games)
+            else -> getString(R.string.record, record.wins, record.played)
         }
         val taken = seats[player] != Seat.NONE
 
@@ -220,10 +250,13 @@ class SetupActivity : Activity() {
         return profiles.last()
     }
 
-    /** The profiles as a leaderboard, best record first; tapping one renames or deletes it. */
+    /**
+     * The profiles as a leaderboard for the picked game, best record first;
+     * tapping one renames or deletes it.
+     */
     private fun manageProfiles() {
         val builder = AlertDialog.Builder(this)
-            .setTitle(R.string.profiles)
+            .setTitle(getString(R.string.profiles_for, getString(nameOf(kind))))
             .setPositiveButton(R.string.done, null)
             .setNeutralButton(R.string.new_profile) { _, _ ->
                 askName(getString(R.string.new_profile_title), "") { name ->
@@ -234,10 +267,11 @@ class SetupActivity : Activity() {
         if (profiles.isEmpty()) {
             builder.setMessage(R.string.no_profiles)
         } else {
-            val ranked = Profiles.ranked(profiles)
+            val ranked = Profiles.ranked(profiles, kind)
             val labels = ranked.map {
-                if (it.played == 0) getString(R.string.profile_unplayed, it.name)
-                else getString(R.string.profile_record, it.name, it.wins, it.played, Profiles.winPercent(it))
+                val record = it.record(kind)
+                if (record.played == 0) getString(R.string.profile_unplayed, it.name)
+                else getString(R.string.profile_record, it.name, record.wins, record.played, Profiles.winPercent(record))
             }
             builder.setItems(labels.toTypedArray()) { _, which -> editProfile(ranked[which]) }
         }
@@ -342,9 +376,15 @@ class SetupActivity : Activity() {
             bare = true
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
-        brand.addView(preview, LinearLayout.LayoutParams(dp(PREVIEW_DP), dp(PREVIEW_DP)).apply {
-            gravity = Gravity.CENTER_HORIZONTAL
-        })
+        snakesPreview = SnakesBoardView(this).apply {
+            bare = true
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }
+        for (board in listOf(preview, snakesPreview)) {
+            brand.addView(board, LinearLayout.LayoutParams(dp(PREVIEW_DP), dp(PREVIEW_DP)).apply {
+                gravity = Gravity.CENTER_HORIZONTAL
+            })
+        }
 
         // The title centred, with the settings button at the end of its row,
         // where the game screen has it too.
@@ -367,6 +407,19 @@ class SetupActivity : Activity() {
             setTextColor(Style.TEXT_DIM)
             gravity = Gravity.CENTER
         }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dp(8) })
+
+        // Which game, first: the saved game and the records below are that game's.
+        val games = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        GameKind.entries.forEachIndexed { i, each ->
+            val button = Style.button(this, getString(nameOf(each)), Style.Kind.SECONDARY).apply {
+                setOnClickListener { pick(each) }
+            }
+            kindButtons[each] = button
+            games.addView(button, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f).apply {
+                if (i > 0) leftMargin = dp(8)
+            })
+        }
+        form.addView(games, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(12) })
 
         savedSection = buildSavedSection()
         form.addView(savedSection, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
@@ -445,7 +498,7 @@ class SetupActivity : Activity() {
             setPadding(dp(20), dp(12), dp(20), dp(12))
             isClickable = true
             isFocusable = true
-            setOnClickListener { startActivity(GameActivity.resume(this@SetupActivity)) }
+            setOnClickListener { startActivity(GameActivity.resume(this@SetupActivity, kind)) }
         }
         card.addView(TextView(this).apply {
             text = getString(R.string.resume_game)
@@ -514,6 +567,11 @@ class SetupActivity : Activity() {
     }
 
     private fun dp(value: Int) = Style.dp(this, value)
+
+    private fun nameOf(kind: GameKind) = when (kind) {
+        GameKind.LUDO -> R.string.game_ludo
+        GameKind.SNAKES -> R.string.game_snakes
+    }
 
     private companion object {
         /** Seats row by row as their yards sit on the board: Red, Green over Blue, Yellow. */

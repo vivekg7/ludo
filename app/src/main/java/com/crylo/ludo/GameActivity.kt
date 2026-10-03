@@ -21,8 +21,30 @@ import android.widget.ScrollView
 import android.widget.TextView
 import kotlin.random.Random
 
+/** What the game screen asks of a game's board, whichever game it is. */
+interface TableBoard<S : Match> {
+
+    /** What each seat is called, in seat order. */
+    var names: Array<String>
+
+    /** Seat the turn marker points at, or -1 for none. */
+    var turn: Int
+
+    /** Whether the names above the board face the far side of a phone lying flat. */
+    var namesFaceTable: Boolean
+
+    fun showState(newState: S)
+
+    fun clearReactions()
+
+    fun cancelAnimations()
+}
+
 /**
- * The game screen, and the turn loop that drives it.
+ * The game screen, and the turn loop that drives it: everything a game of
+ * Ludo and a game of Snakes & Ladders do alike. A subclass supplies the board
+ * and plays a roll; this class rolls the die, passes the dice, saves, and
+ * shows the results.
  *
  * Every transition goes through [beginTurn], which reads the current state and
  * decides what should happen next. That means a game restored from disk
@@ -33,41 +55,64 @@ import kotlin.random.Random
  * [state] the moment they happen; the animations and pauses that follow only
  * show them, so a save taken during one restores to what comes next.
  */
-class GameActivity : Activity() {
+abstract class GameActivity<S : Match, B> : Activity() where B : View, B : TableBoard<S> {
 
-    private lateinit var state: GameState
-    private lateinit var board: BoardView
+    protected abstract val kind: GameKind
+
+    protected lateinit var state: S
+    protected lateinit var board: B
+    protected lateinit var hint: TextView
+    protected lateinit var sounds: Sounds
     private lateinit var die: DieView
     private lateinit var status: TextView
-    private lateinit var hint: TextView
     private lateinit var showResults: Button
     private lateinit var results: FrameLayout
     private lateinit var resultsCard: LinearLayout
     private lateinit var confetti: ConfettiView
-    private lateinit var sounds: Sounds
 
     /**
      * What the banner and the board call each seat: its profile's name, "Bot"
      * and a number for a bot, or its colour for a guest.
      */
-    private lateinit var names: Array<String>
+    protected lateinit var names: Array<String>
 
-    private val handler = Handler(Looper.getMainLooper())
-    private val random = Random.Default
-    private val picker = Picker(random)
+    protected val handler = Handler(Looper.getMainLooper())
+    protected val random = Random.Default
+    protected val picker = Picker(random)
 
     /**
-     * Whether captures and tokens home set off emoji and taunts on the board.
-     * Read with the other settings in [onResume].
+     * Whether the board reacts with emoji and taunts. Read with the other
+     * settings in [onResume].
      */
-    private var reactionsOn = true
-
-    // Read once, since each read builds a new array and the picker tells
-    // pools apart by identity.
-    private lateinit var taunts: Map<Capture, Array<String>>
+    protected var reactionsOn = true
 
     /** True while an animation or a scheduled step owns the turn. */
-    private var busy = false
+    protected var busy = false
+
+    /** A saved game of this kind rebuilt from its string, or null if it is damaged. */
+    protected abstract fun decode(saved: String?): S?
+
+    /** A fresh game for these seats, before anyone has moved. */
+    protected abstract fun newMatch(seats: Array<Seat>): S
+
+    protected abstract fun createBoard(): B
+
+    /** Hooks the board's callbacks up, once the screen is built and before the first turn. */
+    protected open fun wireBoard() {}
+
+    /**
+     * Plays the current player's roll of [face], which is known to count: it
+     * is not a forfeited third six. Ends by passing the turn on through
+     * [handOver] or [pauseThenBeginTurn], rolling again through [beginTurn],
+     * or finishing the game through [celebrateWin].
+     */
+    protected abstract fun playRoll(face: Int)
+
+    /** How far [player] got, under their name in the results. */
+    protected abstract fun progressLine(player: Int): String
+
+    /** Takes back any choice the board is offering, when the game ends. */
+    protected open fun clearChoices() {}
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -76,8 +121,8 @@ class GameActivity : Activity() {
         // configuration change or after killing the process in the background.
         // That intent says "new game", so without the state kept below the
         // game would restart, and the next onPause would save over the real one.
-        state = savedInstanceState?.getString(KEY_STATE)?.let(GameState::decode)
-            ?: (if (intent.getBooleanExtra(EXTRA_RESUME, false)) Saves.load(this) else null)
+        state = savedInstanceState?.getString(KEY_STATE)?.let(::decode)
+            ?: (if (intent.getBooleanExtra(EXTRA_RESUME, false)) decode(Saves.saved(this, kind)) else null)
             ?: newStateFromIntent()
 
         // Bots are numbered in seat order, so two of them can be told apart; a
@@ -86,44 +131,31 @@ class GameActivity : Activity() {
 
         sounds = Sounds()
 
-        taunts = mapOf(
-            Capture.CHEAP to resources.getStringArray(R.array.taunts_cheap),
-            Capture.PLAIN to resources.getStringArray(R.array.taunts_plain),
-            Capture.BIG to resources.getStringArray(R.array.taunts_big),
-            Capture.MULTI to resources.getStringArray(R.array.taunts_multi),
-        )
-
         setContentView(buildUi())
 
-        board.onTokenPicked = { token -> play(token) }
-        board.onSquareReached = { sounds.play(Sound.STEP) }
-        board.onCapture = { token, captured, capturedFrom ->
-            sounds.play(Sound.CAPTURE)
-            buzz(HapticFeedbackConstants.LONG_PRESS)
-            reactToCapture(Board.owner(token), captured, capturedFrom)
-        }
         die.onRollRequested = { roll() }
+        wireBoard()
 
         beginTurn()
     }
 
-    private fun newStateFromIntent(): GameState {
+    private fun newStateFromIntent(): S {
         val raw = intent.getIntArrayExtra(EXTRA_SEATS)
         val seats = Array(Board.PLAYERS) { player ->
             raw?.getOrNull(player)?.let { Seat.entries[it] } ?: Seat.NONE
         }
         val ids = intent.getIntArrayExtra(EXTRA_PROFILES)
-        return GameState(seats).apply {
+        return newMatch(seats).apply {
             for (player in 0 until Board.PLAYERS) {
                 if (seats[player] == Seat.HUMAN) profiles[player] = ids?.getOrNull(player) ?: Profiles.NONE
             }
-            Rules.pickStarter(this, random)
+            Turns.pickStarter(this, random)
         }
     }
 
     // --- turn loop ---------------------------------------------------------
 
-    private fun beginTurn() {
+    protected fun beginTurn() {
         board.showState(state)
 
         if (state.winner >= 0) {
@@ -172,130 +204,53 @@ class GameActivity : Activity() {
     }
 
     private fun resolveRoll(face: Int) {
-        if (state.sixStreak >= Rules.SIX_STREAK_LIMIT) {
+        if (state.sixStreak >= Turns.SIX_STREAK_LIMIT) {
             hint.text = getString(R.string.three_sixes)
             sounds.play(Sound.NO_MOVE)
             handOver()
             return
         }
-
-        val moves = Rules.legalMoves(state, face)
-        val bot = state.isBot(state.current)
-        when {
-            moves.isEmpty() -> {
-                hint.text = getString(R.string.no_move, face)
-                sounds.play(Sound.NO_MOVE)
-                handOver()
-            }
-
-            // With a single option there is nothing to decide, so play it
-            // rather than making the player tap the only legal token. Tokens
-            // stacked on one square are a single option too.
-            Rules.isForced(state, moves) || bot -> {
-                val token = if (bot) Bot.chooseMove(state, face, moves, random) else moves[0]
-                busy = true
-                handler.postDelayed({ busy = false; play(token) }, if (bot) BOT_THINK_MS else AUTO_MOVE_MS)
-            }
-
-            else -> {
-                busy = false
-                hint.text = getString(R.string.pick_token)
-                board.setHighlights(moves)
-            }
-        }
-    }
-
-    private fun play(token: Int) {
-        if (busy || state.die == 0) return
-        busy = true
-        board.clearHighlights()
-
-        val face = state.die
-        val before = state.steps.copyOf()
-        val move = Rules.apply(state, token, face)
-        // Settled before the token starts to slide: were the die left set, a
-        // game saved mid-animation would restore with the token already moved
-        // and the same roll still to play.
-        Rules.settle(state, move)
-        // Credited here, the one place a win happens, rather than once the
-        // animation ends, when an activity closed mid-slide would never get
-        // to it; a restored finished game only announces, so none counts twice.
-        if (state.winner >= 0) Saves.saveProfiles(this, Profiles.recordGame(Saves.profiles(this), state))
-        // Captured tokens are drawn where they stood until the move lands.
-        val capturedFrom = IntArray(move.captured.size) { before[move.captured[it]] }
-
-        board.showState(state)
-        board.animateMove(move.token, move.from, move.to, move.captured, capturedFrom) {
-            afterMove(move)
-        }
-    }
-
-    private fun afterMove(move: Move) {
-        // Played here, as the move lands, rather than in announceWinner, which
-        // also runs for a finished game restored after a rotation.
-        if (state.winner >= 0) {
-            sounds.play(Sound.WIN)
-            announceWinner(justWon = true)
-            // After announceWinner, which clears the handler these are queued on.
-            for (i in 0 until WIN_BUZZES) {
-                handler.postDelayed({ buzz(HapticFeedbackConstants.CONFIRM) }, i * WIN_BUZZ_GAP_MS)
-            }
-            // The confetti is here for the same reason as the fanfare. The
-            // results wait a moment so the winning token is seen arriving.
-            confetti.burst()
-            handler.postDelayed({ openResults() }, RESULTS_DELAY_MS)
-            return
-        }
-
-        // A capture has already sounded through board.onCapture, as its token
-        // landed; this runs once the captured tokens are back in their yard.
-        if (move.finished) {
-            sounds.play(Sound.HOME)
-            if (reactionsOn) board.react(Board.owner(move.token), picker.pick(Reactions.cheer))
-        }
-
-        hint.text = when {
-            move.captured.isNotEmpty() -> getString(R.string.captured)
-            move.finished -> getString(R.string.token_home)
-            move.extraTurn -> getString(R.string.rolled_six)
-            else -> ""
-        }
-
-        if (move.extraTurn) {
-            busy = false
-            beginTurn()
-        } else {
-            // play() has already passed the dice.
-            pauseThenBeginTurn()
-        }
+        playRoll(face)
     }
 
     /**
-     * The capturing player gloats in their yard and taunts from their name,
-     * and each player who lost a token sulks in theirs. How loud depends on
-     * how much the capture cost. Nothing here holds up the turn.
+     * Credits a game the move just applied has won. Called from the one place
+     * a win happens, as the move is applied, rather than once its animation
+     * ends, when an activity closed mid-slide would never get to it; a
+     * restored finished game only announces, so none counts twice.
      */
-    private fun reactToCapture(attacker: Int, captured: IntArray, capturedFrom: IntArray) {
-        if (!reactionsOn) return
-        val kind = Reactions.capture(captured.size, capturedFrom.max())
-        board.react(attacker, picker.pick(Reactions.gloat.getValue(kind)))
-        board.say(attacker, picker.pick(taunts.getValue(kind)))
-        for (victim in captured.map(Board::owner).distinct()) {
-            board.react(victim, picker.pick(Reactions.sulk.getValue(kind)))
+    protected fun creditIfWon() {
+        if (state.winner >= 0) Saves.saveProfiles(this, Profiles.recordGame(Saves.profiles(this), state))
+    }
+
+    /**
+     * The fanfare, the buzzes, the confetti and the results, once the winning
+     * move has landed. Played from there, rather than from [announceWinner],
+     * which also runs for a finished game restored after a rotation.
+     */
+    protected fun celebrateWin() {
+        sounds.play(Sound.WIN)
+        announceWinner(justWon = true)
+        // After announceWinner, which clears the handler these are queued on.
+        for (i in 0 until WIN_BUZZES) {
+            handler.postDelayed({ buzz(HapticFeedbackConstants.CONFIRM) }, i * WIN_BUZZ_GAP_MS)
         }
+        // The results wait a moment so the winning token is seen arriving.
+        confetti.burst()
+        handler.postDelayed({ openResults() }, RESULTS_DELAY_MS)
     }
 
     /** Passes the dice on a roll that cannot be played. */
-    private fun handOver() {
+    protected fun handOver() {
         // Passed now rather than after the pause, so a game saved during the
         // pause belongs to the next player instead of handing this one a
         // fresh roll.
-        Rules.passTurn(state)
+        Turns.passTurn(state)
         pauseThenBeginTurn()
     }
 
     /** Pauses a beat so the player can read the outcome before the next turn. */
-    private fun pauseThenBeginTurn() {
+    protected fun pauseThenBeginTurn() {
         busy = true
         handler.postDelayed({
             busy = false
@@ -306,17 +261,17 @@ class GameActivity : Activity() {
     /**
      * Ends the game on screen. A game restored already won opens its results
      * straight away; a win that has just happened ([justWon]) opens them from
-     * [afterMove], once the winning token has been seen arriving.
+     * [celebrateWin], once the winning token has been seen arriving.
      */
     private fun announceWinner(justWon: Boolean = false) {
         handler.removeCallbacksAndMessages(null)
-        board.clearHighlights()
+        clearChoices()
         die.rollable = false
         busy = true
         board.turn = state.winner
         status.text = getString(R.string.wins, names[state.winner])
         hint.text = ""
-        Saves.clear(this)
+        Saves.clear(this, kind)
         if (!justWon) openResults()
     }
 
@@ -324,8 +279,8 @@ class GameActivity : Activity() {
 
     /**
      * Fills and shows the results card over the screen: everyone in finishing
-     * order with how far they got and, for a profile, their record now this
-     * game is counted, and the choice of a rematch or a new lineup.
+     * order with how far they got and, for a profile, their record in this
+     * game now this one is counted, and the choice of a rematch or a new lineup.
      */
     private fun openResults() {
         resultsCard.removeAllViews()
@@ -340,11 +295,11 @@ class GameActivity : Activity() {
 
         val profiles = Saves.profiles(this).associateBy { it.id }
         val places = resources.getStringArray(R.array.places)
-        val order = Rules.standings(state)
+        val order = state.standings()
         var place = 0
         order.forEachIndexed { i, player ->
             // Level players share a place, as in any race.
-            if (i == 0 || !Rules.sameStanding(state, order[i - 1], player)) place = i
+            if (i == 0 || !state.sameStanding(order[i - 1], player)) place = i
             resultsCard.addView(resultRow(places[place], player, profiles[state.profiles[player]]))
         }
 
@@ -390,16 +345,16 @@ class GameActivity : Activity() {
             ellipsize = TextUtils.TruncateAt.END
         })
         text.addView(TextView(this).apply {
-            val home = state.tokensHome(player)
-            this.text = getString(R.string.progress, Board.travelPercent(state.travelled(player)), home, Board.TOKENS_PER_PLAYER)
+            this.text = progressLine(player)
             textSize = 13f
             setTextColor(Style.TEXT_DIM)
         })
         row.addView(text, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f).apply { leftMargin = dp(12) })
 
         if (profile != null) {
+            val record = profile.record(kind)
             row.addView(TextView(this).apply {
-                this.text = getString(R.string.record, profile.wins, profile.played)
+                this.text = getString(R.string.record, record.wins, record.played)
                 textSize = 13f
                 setTextColor(Style.TEXT_DIM)
             }, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { leftMargin = dp(8) })
@@ -417,10 +372,10 @@ class GameActivity : Activity() {
         board.cancelAnimations()
         confetti.stop()
         val finished = state
-        state = GameState(finished.seats.copyOf()).also {
+        state = newMatch(finished.seats.copyOf()).also {
             finished.profiles.copyInto(it.profiles)
             // Drawn afresh, like any new game, rather than going to the winner.
-            Rules.pickStarter(it, random)
+            Turns.pickStarter(it, random)
         }
         results.visibility = View.GONE
         showResults.visibility = View.GONE
@@ -433,7 +388,7 @@ class GameActivity : Activity() {
      * A short vibration through the view, which needs no permission and is
      * skipped by the system when the player has touch feedback turned off.
      */
-    private fun buzz(kind: Int) {
+    protected fun buzz(kind: Int) {
         board.performHapticFeedback(kind)
     }
 
@@ -453,7 +408,7 @@ class GameActivity : Activity() {
     override fun onPause() {
         super.onPause()
         sounds.pause()
-        if (state.winner < 0) Saves.save(this, state) else Saves.clear(this)
+        if (state.winner < 0) Saves.save(this, state) else Saves.clear(this, kind)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -492,7 +447,7 @@ class GameActivity : Activity() {
             gravity = Gravity.CENTER
         }
 
-        board = BoardView(this)
+        board = createBoard()
         board.names = names
         val holder = FrameLayout(this).apply {
             addView(board, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT, Gravity.CENTER))
@@ -596,8 +551,8 @@ class GameActivity : Activity() {
         private const val EXTRA_RESUME = "resume"
         private const val KEY_STATE = "state"
 
-        private const val BOT_THINK_MS = 620L
-        private const val AUTO_MOVE_MS = 180L
+        internal const val BOT_THINK_MS = 620L
+        internal const val AUTO_MOVE_MS = 180L
         private const val HAND_OVER_MS = 750L
 
         private const val TOGGLE_DP = 48
@@ -612,12 +567,17 @@ class GameActivity : Activity() {
 
         private const val BACKGROUND = 0xFF12161C.toInt()
 
-        fun newGame(context: Context, seats: Array<Seat>, profiles: IntArray): Intent =
-            Intent(context, GameActivity::class.java)
+        private fun screenFor(kind: GameKind): Class<out Activity> = when (kind) {
+            GameKind.LUDO -> LudoActivity::class.java
+            GameKind.SNAKES -> SnakesActivity::class.java
+        }
+
+        fun newGame(context: Context, kind: GameKind, seats: Array<Seat>, profiles: IntArray): Intent =
+            Intent(context, screenFor(kind))
                 .putExtra(EXTRA_SEATS, IntArray(seats.size) { seats[it].ordinal })
                 .putExtra(EXTRA_PROFILES, profiles)
 
-        fun resume(context: Context): Intent =
-            Intent(context, GameActivity::class.java).putExtra(EXTRA_RESUME, true)
+        fun resume(context: Context, kind: GameKind): Intent =
+            Intent(context, screenFor(kind)).putExtra(EXTRA_RESUME, true)
     }
 }

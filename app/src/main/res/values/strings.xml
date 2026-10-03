@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">Ludo</string>
+    <string name="game_ludo">Ludo</string>
+    <string name="game_snakes">Snakes &amp; Ladders</string>
     <string name="tagline">Local, offline, pass-and-play</string>
 
     <string name="seat_guest">Guest</string>
@@ -27,6 +29,8 @@
     <string name="replace_save_confirm">Start new game</string>
 
     <string name="profiles">Profiles</string>
+    <!-- The leaderboard's title: whose records it ranks. -->
+    <string name="profiles_for">Profiles · %1$s</string>
     <string name="no_profiles">No profiles yet. Give everyone one and each keeps their own wins.</string>
     <string name="profile_record">%1$s · won %2$d of %3$d · %4$d%%</string>
     <string name="profile_unplayed">%1$s · no games yet</string>
@@ -53,6 +57,10 @@
     <string name="captured">Captured! Roll again</string>
     <string name="token_home">Home! Roll again</string>
     <string name="rolled_six">Six — roll again</string>
+    <string name="overshoot">Too far: the last square needs an exact roll, not a %1$d</string>
+    <string name="ladder">Up the ladder from %1$d to %2$d!</string>
+    <string name="snake">Bitten! Down from %1$d to %2$d</string>
+    <string name="on_square">on square %1$d</string>
     <string name="wins">%1$s wins!</string>
     <string name="rematch">Rematch</string>
     <string name="change_players">Change players</string>
@@ -72,7 +80,7 @@
     <string name="setting_sound">Sound</string>
     <string name="setting_sound_detail">Rolls, moves, captures and wins</string>
     <string name="setting_reactions">Emoji and taunts</string>
-    <string name="setting_reactions_detail">The board reacts when a token is captured or gets home</string>
+    <string name="setting_reactions_detail">The board reacts when a token is captured, gets home, climbs a ladder or meets a snake</string>
     <string name="setting_face_table">Top names face the far side</string>
     <string name="setting_face_table_detail">For a phone lying flat: the names above the board turn to face the far end</string>
 

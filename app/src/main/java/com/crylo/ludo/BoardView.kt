@@ -33,7 +33,7 @@ import kotlin.math.sin
  * name over its own yard, and the turn marker. They are drawn here rather than
  * as separate views so they stay lined up with the yards at any aspect ratio.
  */
-class BoardView(context: Context) : View(context) {
+class BoardView(context: Context) : View(context), TableBoard<GameState> {
 
     /** Called when the player taps one of the currently highlighted tokens. */
     var onTokenPicked: ((Int) -> Unit)? = null
@@ -47,8 +47,7 @@ class BoardView(context: Context) : View(context) {
      */
     var onCapture: ((token: Int, captured: IntArray, capturedFrom: IntArray) -> Unit)? = null
 
-    /** What each seat is called, in seat order. */
-    var names: Array<String> = Board.names
+    override var names: Array<String> = Board.names
         set(value) {
             field = value
             nameTexts.fill(null)
@@ -59,7 +58,7 @@ class BoardView(context: Context) : View(context) {
      * Turns the names above the board upside down, to face the players sitting
      * at that end of a phone lying flat on the table.
      */
-    var namesFaceTable = false
+    override var namesFaceTable = false
         set(value) {
             field = value
             invalidate()
@@ -81,7 +80,7 @@ class BoardView(context: Context) : View(context) {
      * rather than read from the state, which passes the dice on before the
      * previous player's token has finished sliding.
      */
-    var turn = -1
+    override var turn = -1
         set(value) {
             field = value
             invalidate()
@@ -167,7 +166,7 @@ class BoardView(context: Context) : View(context) {
         buildArrow()
     }
 
-    fun showState(newState: GameState) {
+    override fun showState(newState: GameState) {
         state = newState
         invalidate()
     }
@@ -275,7 +274,7 @@ class BoardView(context: Context) : View(context) {
         showReactions(BUBBLE_MS)
     }
 
-    fun clearReactions() {
+    override fun clearReactions() {
         emojis.fill(null)
         sayings.fill(null)
         sayingTexts.fill(null)
@@ -303,7 +302,7 @@ class BoardView(context: Context) : View(context) {
         }
     }
 
-    fun cancelAnimations() {
+    override fun cancelAnimations() {
         clearReactions()
         mover?.cancel()
         mover = null

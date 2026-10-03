@@ -3,16 +3,20 @@ package com.crylo.ludo
 import android.content.Context
 
 /**
- * Everything the game keeps between launches, in SharedPreferences: the game
- * in progress, the profiles, who last sat where, whether sound is on, which
- * way the names above the board face, and whether the board reacts to
- * captures. Each encodes to a short string, so there is nothing here worth a
- * database.
+ * Everything the game keeps between launches, in SharedPreferences: a game in
+ * progress for each kind of game, the profiles, who last sat where, which game
+ * was picked last, whether sound is on, which way the names above the board
+ * face, and whether the board reacts to captures. Each encodes to a short
+ * string, so there is nothing here worth a database.
  */
 object Saves {
 
     private const val FILE = "ludo"
-    private const val KEY = "game"
+    // Ludo keeps the key it had before there was a second game, so a game
+    // left in progress across that update still resumes.
+    private const val KEY_LUDO = "game"
+    private const val KEY_SNAKES = "game_snakes"
+    private const val KEY_KIND = "kind"
     private const val KEY_PROFILES = "profiles"
     private const val KEY_NEXT_PROFILE_ID = "next_profile_id"
     private const val KEY_LINEUP = "lineup"
@@ -23,15 +27,36 @@ object Saves {
     private fun prefs(context: Context) =
         context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
 
-    fun save(context: Context, state: GameState) {
-        prefs(context).edit().putString(KEY, state.encode()).apply()
+    // --- saved games -------------------------------------------------------
+
+    /**
+     * One slot per kind of game, so starting a game of one does not throw
+     * away a game of the other left half played.
+     */
+    private fun keyOf(kind: GameKind) = when (kind) {
+        GameKind.LUDO -> KEY_LUDO
+        GameKind.SNAKES -> KEY_SNAKES
     }
 
-    fun load(context: Context): GameState? =
-        GameState.decode(prefs(context).getString(KEY, null))
+    fun save(context: Context, match: Match) {
+        prefs(context).edit().putString(keyOf(match.kind), match.encode()).apply()
+    }
 
-    fun clear(context: Context) {
-        prefs(context).edit().remove(KEY).apply()
+    /** The saved game of [kind], still encoded, or null if there is none. */
+    fun saved(context: Context, kind: GameKind): String? = prefs(context).getString(keyOf(kind), null)
+
+    fun load(context: Context, kind: GameKind): Match? = kind.decode(saved(context, kind))
+
+    fun clear(context: Context, kind: GameKind) {
+        prefs(context).edit().remove(keyOf(kind)).apply()
+    }
+
+    /** The game picked last on the setup screen, so it opens on that one again. */
+    fun kind(context: Context): GameKind =
+        GameKind.entries.getOrNull(prefs(context).getInt(KEY_KIND, 0)) ?: GameKind.LUDO
+
+    fun setKind(context: Context, kind: GameKind) {
+        prefs(context).edit().putInt(KEY_KIND, kind.ordinal).apply()
     }
 
     // --- profiles ----------------------------------------------------------

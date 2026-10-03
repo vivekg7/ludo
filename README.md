@@ -1,10 +1,11 @@
 # Ludo
 
-A lightweight, fully offline Ludo game for Android. Pass-and-play with up to
-four people on one device, any seat swappable for a bot, and a profile for each
-person that keeps their wins.
+A lightweight, fully offline Ludo game for Android, with Snakes & Ladders as a
+second game. Pass-and-play with up to four people on one device, any seat
+swappable for a bot, and a profile for each person that keeps their wins in
+each game.
 
-Requires **Android 12 (API 31)** or newer. The signed release APK is **64 KB**.
+Requires **Android 12 (API 31)** or newer. The signed release APK is **76 KB**.
 There are no runtime dependencies beyond the
 Kotlin standard library — no AndroidX, no Compose, no Material. The board and
 die are two custom `View`s drawing on a `Canvas`, the sound effects are
@@ -77,6 +78,8 @@ that came out unsigned is refused outright rather than archived under a release 
 
 ## Rules
 
+### Ludo
+
 The variant here is the one most people play:
 
 - **A random seat rolls first.** Going first is a small edge, so it is drawn
@@ -94,10 +97,37 @@ The variant here is the one most people play:
 
 Tokens of the same colour may stack on one square. There is no blocking rule.
 
+### Snakes & Ladders
+
+A 10×10 board numbered from 1 in the bottom left, back and forth up to 100 in
+the top left, with the classic Milton Bradley snakes and ladders — less its
+ladder on square 1, which is where everyone starts here, so nobody could land
+on it.
+
+- Each player has one token, and everyone starts on square 1.
+- Landing on the foot of a ladder climbs it; landing on a snake's head slides
+  down to its tail.
+- The first to land on **100 exactly** wins. A roll that would go past it is not
+  played.
+- A **6** grants another roll, and three in a row forfeits the turn, as in Ludo.
+- Tokens never capture; any number may share a square.
+
+A roll has at most one move, so there is nothing to pick: once the die lands
+the token walks on its own. A bot seat just rolls without waiting for a tap.
+
 ## Setup screen
 
-The first screen shows the lineup for a new game and, when there is one, the
-saved game.
+The first screen shows which game to play, the lineup for a new game and, when
+there is one, that game's saved game.
+
+- **The game is picked first**, Ludo or Snakes & Ladders, from two buttons under
+  the title. Everything below follows the pick: the saved game, each seat's
+  record, the leaderboard behind Profiles, and the small board above the title.
+  The pick is remembered, so the screen opens on the game played last. The
+  seats are shared: the same family usually plays both.
+- **Each game has its own saved game.** Starting a game of one does not throw
+  away a half-played game of the other. Ludo kept the save key it had before
+  there was a second game, so a game in progress across that update resumes.
 
 - **A saved game comes first.** It is an amber card above the lineup, listing
   its players leader first with how far each has got — "Vivek 34% · Jyoti 21%" —
@@ -119,7 +149,8 @@ saved game.
 - **Start counts the players** — "Start game · 3 players" — and is disabled,
   with the reason shown under the rows, until there are at least two.
 - **A small board above the title shows the lineup** as it will be played,
-  drawn by `BoardView` in its `bare` mode (no name strips, no progress):
+  drawn by `BoardView` (or `SnakesBoardView`) in its `bare` mode (no name
+  strips, no progress or square numbers):
   seated colours with their tokens in the yard, empty ones greyed out as they
   will be in the game. It is kept small, since the grid below it is where
   seats are picked, and the launcher icon is the same board, with a
@@ -136,9 +167,13 @@ saved game.
 ## Profiles
 
 Each seat is a profile, a guest, a bot, or empty. A profile is a name and a
-record — games played and games won — kept on the device. The Profiles button
-on the setup screen lists everyone's record, best first, and renames or deletes
-them; a new profile can also be made straight from a seat.
+record per game — games played and games won — kept on the device. The Profiles
+button on the setup screen lists everyone's record in the picked game, best
+first, and renames or deletes them; a new profile can also be made straight
+from a seat.
+
+- **Each game keeps its own record.** Ludo rewards choices and Snakes & Ladders
+  is pure luck, so a win in one should not climb the other's leaderboard.
 
 - **Records are ranked by wins**, then by fewer games taken to win them, then by
   name, and each shows its win rate. Wins come before win rate so that someone
@@ -146,8 +181,8 @@ them; a new profile can also be made straight from a seat.
 - **Only a finished game counts.** When a game is won, every seated profile
   gets a game played and the winner's gets a win. An abandoned game changes
   nothing, so quitting a losing game is not recorded as a loss — and a finished
-  game is credited in exactly one place, `GameActivity.play`, the moment the
-  winning move is applied, so it cannot count twice or be lost to the app
+  game is credited in exactly one place, `GameActivity.creditIfWon`, called
+  the moment the winning move is applied, so it cannot count twice or be lost to the app
   closing mid-animation.
 - **Bots and guests have no record.** A guest seat is for a visitor who does
   not need one.
@@ -162,9 +197,14 @@ them; a new profile can also be made straight from a seat.
   the same family does not pick seats again each game, and backing out of the
   setup screen keeps the picks.
 
-The game save format is at version 2, which adds the per-seat profile ids. A
+The Ludo save format is at version 2, which adds the per-seat profile ids. A
 version 1 save, from before profiles, still resumes with its human seats as
 guests, so a game left in progress across the update is not lost.
+
+The profiles save starts with a `#2` version line and holds both records on
+each line. A save without that line is from before Snakes & Ladders, and its
+one record per profile comes back as the Ludo record, so nobody's wins are
+lost to the update.
 
 ## Game screen
 
@@ -281,14 +321,37 @@ board; it is white on red, green and blue, and dark on yellow.
   follows the system's touch-feedback setting, so it is off for anyone who has
   turned that off. Sixes a bot rolls do not vibrate, since nobody rolled them.
 
+### Snakes & Ladders
+
+The screen is the same — banner, die, results, settings, sounds — around a
+different board, drawn by `SnakesBoardView`:
+
+- **Laid out like the Ludo board.** The names sit in strips above and below the
+  board, over the side where that colour's yard would be, sized in fifteenths
+  of the board — a Ludo cell — so the two games' screens read alike.
+- **Drawn, not pictures.** The squares alternate two paper tones, with 100 in
+  gold. Ladders are two rails and rungs. Each snake is a wave along the line
+  from its head to its tail, tapering, outlined and spotted, with eyes and a
+  tongue, in colours that are none of the seats'. Nothing is an image file, as
+  with the Ludo board.
+- **A move walks, then climbs or slides.** The token walks square by square to
+  where the roll took it, with a tap for each, then goes straight up the
+  ladder, or down the snake along its own body. A ladder plays the home chime
+  and a snake the capture slide and a vibration, and an emoji pops over the
+  token (🚀 or 😱). The whole move is in the state before the token sets off,
+  as in Ludo.
+- **The current player's token has a ring**, since four tokens on a hundred
+  squares take longer to find than a yard.
+- **The results** list everyone by square reached, "on square 67".
+
 ## Settings
 
 Opened by the ⚙ on the setup screen and on the game screen, and kept in
 `Saves` like the rest:
 
 - **Sound**, on by default.
-- **Emoji and taunts**, the reactions to a capture or a token home; on by
-  default.
+- **Emoji and taunts**, the reactions to a capture or a token home, and to a
+  ladder or a snake; on by default.
 - **Top names face the far side**, which turns the top two names and progress
   upside down to face the players at the far end of a phone lying flat on the
   table. Off by default, because a phone passed from hand to hand is always
@@ -364,27 +427,41 @@ cannot be captured, so those tokens can never collide with anything.
 
 ## Layout
 
-| File                  | What it does                                                     |
-| --------------------- | ---------------------------------------------------------------- |
-| `Board.kt`            | Board geometry: the ring, home runs, yards, safe squares         |
-| `Game.kt`             | `GameState`, its save encoding, and `Rules` — the whole variant  |
-| `Profile.kt`          | Profiles: names, win records, and their save encoding            |
-| `Bot.kt`              | One-ply heuristic opponent                                       |
-| `BoardView.kt`        | Draws the board, tokens and seat names; turns taps into choices  |
-| `Reactions.kt`        | Which emoji and taunts a capture or a token home sets off        |
-| `DieView.kt`          | The die, and its tumble animation                                |
-| `ConfettiView.kt`     | The confetti over the results of a won game                      |
-| `Style.kt`            | Colours, buttons and panels shared by the screens                |
-| `Sounds.kt`           | Synthesises and plays the sound effects                          |
-| `GameActivity.kt`     | The turn loop, and the results of a won game                     |
-| `SettingsActivity.kt` | The settings page: sound, reactions, name facing                 |
-| `SetupActivity.kt`    | Seat picker, profile leaderboard and resume                      |
-| `Saves.kt`            | Saved game, profiles, lineup and settings (preferences)          |
-| `Insets.kt`           | Keeps content clear of the system bars under forced edge-to-edge |
+| File                  | What it does                                                                 |
+| --------------------- | ---------------------------------------------------------------------------- |
+| `Match.kt`            | `Match`, the state every game shares, and its save encoding; `Turns`         |
+| `Board.kt`            | Ludo board geometry: the ring, home runs, yards, safe squares                |
+| `Game.kt`             | `GameState` and `Rules` — the whole Ludo variant                             |
+| `Snakes.kt`           | `SnakesState` and `Snakes` — the Snakes & Ladders board and rules            |
+| `Profile.kt`          | Profiles: names, a win record per game, and their save encoding              |
+| `Bot.kt`              | One-ply heuristic Ludo opponent                                              |
+| `BoardView.kt`        | Draws the Ludo board, tokens and seat names; turns taps into choices         |
+| `SnakesBoardView.kt`  | Draws the Snakes & Ladders board, tokens and seat names                      |
+| `Reactions.kt`        | Which emoji and taunts a capture, a token home, a ladder or a snake sets off |
+| `DieView.kt`          | The die, and its tumble animation                                            |
+| `ConfettiView.kt`     | The confetti over the results of a won game                                  |
+| `Style.kt`            | Colours, buttons and panels shared by the screens                            |
+| `Sounds.kt`           | Synthesises and plays the sound effects                                      |
+| `GameActivity.kt`     | The game screen for any game: the turn loop, saving, and the results         |
+| `LudoActivity.kt`     | A game of Ludo on that screen: picking tokens, captures, reactions           |
+| `SnakesActivity.kt`   | A game of Snakes & Ladders on that screen                                    |
+| `SettingsActivity.kt` | The settings page: sound, reactions, name facing                             |
+| `SetupActivity.kt`    | Game and seat picker, profile leaderboard and resume                         |
+| `Saves.kt`            | A saved game per game, profiles, lineup and settings (preferences)           |
+| `Insets.kt`           | Keeps content clear of the system bars under forced edge-to-edge             |
 
-`Game.kt`, `Board.kt`, `Profile.kt` and `Reactions.kt` touch no Android APIs,
-so the rules, the profile records and the reaction picks are exercised from
-plain JVM unit tests in `app/src/test`.
+`Match.kt`, `Game.kt`, `Snakes.kt`, `Board.kt`, `Profile.kt` and `Reactions.kt`
+touch no Android APIs, so both games' rules, the profile records and the
+reaction picks are exercised from plain JVM unit tests in `app/src/test`.
+
+**Adding a game** means a `Match` subclass for its state, a pure rules object,
+a board view implementing `TableBoard`, and a `GameActivity` subclass that
+plays a roll. `GameActivity` keeps everything the games do alike — rolling,
+the six streak, passing the dice, saving, crediting a win, the results and
+rematch — so the Ludo and Snakes & Ladders screens hold only what differs.
+It is an abstract base class rather than one activity switching on the game,
+so each game's turn code reads straight through without the other's in the
+way.
 
 Every transition in `GameActivity` goes through `beginTurn()`, which reads the
 state and decides what happens next. A game restored from disk mid-turn — even
@@ -393,8 +470,8 @@ separate restore logic to keep in sync.
 
 That only works if the state is never mid-way through anything. The token
 slide and the pause before the next player are purely visual: a move, and the
-turn it settles (`Rules.settle` — the same player rolls again, or the dice pass
-on), are written to the state the instant the move is chosen. Leaving the roll
+turn it settles (`Rules.settle` or `Snakes.settle` — the same player rolls
+again, or the dice pass on), are written to the state the instant the move is chosen. Leaving the roll
 in place until the animation finished would let a game saved during it restore
 with the token already moved and the same roll still to play.
 
@@ -441,7 +518,7 @@ Estimated at 200–300 lines replacing the current tumble, with no change to
 the APK's size. Breathing, the landing pop and bot rolls carry over.
 
 Rejected: an OpenGL engine (Filament, SceneView) would add several MB to a
-roughly 64 KB APK for one small cube. A physics die bouncing across the
+roughly 76 KB APK for one small cube. A physics die bouncing across the
 board would be much more work, and it cannot easily land on a result chosen
 before the roll.
 

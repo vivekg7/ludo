@@ -1,14 +1,34 @@
 package com.crylo.ludo
 
+/** Games finished and games won, in one game. */
+data class Record(val played: Int = 0, val wins: Int = 0)
+
 /**
- * A named player who keeps their record between games.
+ * A named player who keeps a record in each game between sessions. A Ludo win
+ * and a Snakes & Ladders win are kept apart, since one is a game of choices
+ * and the other pure luck, and the two leaderboards should not mix them.
  *
  * Seats refer to a profile by [id], never by name, so renaming someone
  * mid-game relabels their seat instead of orphaning it. Ids come from a
  * counter in [Saves] and are never reused, so a saved game cannot credit a
  * deleted profile's seat to whoever was created after it.
  */
-data class Profile(val id: Int, val name: String, val played: Int = 0, val wins: Int = 0)
+data class Profile(
+    val id: Int,
+    val name: String,
+    val ludo: Record = Record(),
+    val snakes: Record = Record(),
+) {
+    fun record(kind: GameKind): Record = when (kind) {
+        GameKind.LUDO -> ludo
+        GameKind.SNAKES -> snakes
+    }
+
+    fun withRecord(kind: GameKind, record: Record): Profile = when (kind) {
+        GameKind.LUDO -> copy(ludo = record)
+        GameKind.SNAKES -> copy(snakes = record)
+    }
+}
 
 /**
  * The list of profiles, as pure functions. Like [Rules], nothing here touches
@@ -46,34 +66,36 @@ object Profiles {
         profiles.filterNot { it.id == id }
 
     /**
-     * Credits a finished game: one game played for every seated profile, and a
-     * win for the winner's. Bots and guests carry no profile and so no record.
-     * Only a game that reaches a winner counts — an abandoned one is not a loss.
+     * Credits a finished game to the record for its kind: one game played for
+     * every seated profile, and a win for the winner's. Bots and guests carry
+     * no profile and so no record. Only a game that reaches a winner counts —
+     * an abandoned one is not a loss.
      */
-    fun recordGame(profiles: List<Profile>, state: GameState): List<Profile> {
-        if (state.winner < 0) return profiles
-        val seated = state.profiles.filter { it != NONE }.toSet()
-        val winner = state.profiles[state.winner]
+    fun recordGame(profiles: List<Profile>, match: Match): List<Profile> {
+        if (match.winner < 0) return profiles
+        val seated = match.profiles.filter { it != NONE }.toSet()
+        val winner = match.profiles[match.winner]
         return profiles.map {
-            if (it.id !in seated) it
-            else it.copy(played = it.played + 1, wins = it.wins + if (it.id == winner) 1 else 0)
+            if (it.id !in seated) return@map it
+            val record = it.record(match.kind)
+            it.withRecord(match.kind, Record(record.played + 1, record.wins + if (it.id == winner) 1 else 0))
         }
     }
 
     /**
-     * Best record first: most wins, then fewest games taken to win them, then
-     * by name. Ranked by wins rather than win rate, so one lucky first game
-     * does not put a newcomer above someone who has won ten.
+     * Best record in [kind] first: most wins, then fewest games taken to win
+     * them, then by name. Ranked by wins rather than win rate, so one lucky
+     * first game does not put a newcomer above someone who has won ten.
      */
-    fun ranked(profiles: List<Profile>): List<Profile> =
+    fun ranked(profiles: List<Profile>, kind: GameKind): List<Profile> =
         profiles.sortedWith(
-            compareByDescending<Profile> { it.wins }
-                .thenBy { it.played }
+            compareByDescending<Profile> { it.record(kind).wins }
+                .thenBy { it.record(kind).played }
                 .thenBy(String.CASE_INSENSITIVE_ORDER) { it.name },
         )
 
     /** Share of games won, rounded down so 100 means never lost. */
-    fun winPercent(profile: Profile): Int = if (profile.played == 0) 0 else profile.wins * 100 / profile.played
+    fun winPercent(record: Record): Int = if (record.played == 0) 0 else record.wins * 100 / record.played
 
     /**
      * What each seat is called on screen: its profile's name, "Bot 1", "Bot 2"
@@ -98,21 +120,37 @@ object Profiles {
         }
     }
 
-    /** One profile per line, name last so it may contain the separator. */
+    /**
+     * A version line, then one profile per line: its id, its Ludo record, its
+     * Snakes & Ladders record, and its name last so it may contain the
+     * separator. A line cannot start with "#", since every profile line starts
+     * with its id, which is how the version line is told apart.
+     */
     fun encode(profiles: List<Profile>): String =
-        profiles.joinToString("\n") { "${it.id},${it.played},${it.wins},${it.name}" }
+        (listOf(VERSION_LINE) + profiles.map {
+            "${it.id},${it.ludo.played},${it.ludo.wins},${it.snakes.played},${it.snakes.wins},${it.name}"
+        }).joinToString("\n")
 
     fun decode(saved: String?): List<Profile> {
         if (saved.isNullOrEmpty()) return emptyList()
+        val lines = saved.split('\n')
+        // Before there was a second game the save had no version line, and
+        // each line held the one record, which was Ludo's.
+        val current = lines[0] == VERSION_LINE
+        val fields = if (current) 6 else 4
         // A damaged line costs that one profile, not everybody's.
-        return saved.split('\n').mapNotNull { line ->
-            val parts = line.split(',', limit = 4)
-            if (parts.size != 4) return@mapNotNull null
-            val id = parts[0].toIntOrNull() ?: return@mapNotNull null
-            val played = parts[1].toIntOrNull() ?: return@mapNotNull null
-            val wins = parts[2].toIntOrNull() ?: return@mapNotNull null
-            val name = clean(parts[3])
-            if (id <= NONE || name.isEmpty()) null else Profile(id, name, played, wins)
+        return lines.drop(if (current) 1 else 0).mapNotNull { line ->
+            val parts = line.split(',', limit = fields)
+            if (parts.size != fields) return@mapNotNull null
+            val numbers = parts.dropLast(1).map { it.toIntOrNull() ?: return@mapNotNull null }
+            val id = numbers[0]
+            val name = clean(parts.last())
+            if (id <= NONE || name.isEmpty()) return@mapNotNull null
+            val ludo = Record(numbers[1], numbers[2])
+            val snakes = if (current) Record(numbers[3], numbers[4]) else Record()
+            Profile(id, name, ludo, snakes)
         }.distinctBy { it.id }
     }
+
+    private const val VERSION_LINE = "#2"
 }
