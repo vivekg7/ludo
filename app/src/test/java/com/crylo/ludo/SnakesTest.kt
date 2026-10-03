@@ -42,6 +42,20 @@ class SnakesTest {
         assertEquals("keys are unique", SnakesLayout.entries.size, SnakesLayout.entries.map { it.key }.toSet().size)
     }
 
+    @Test
+    fun `no ladder or snake lies flat across the board`() {
+        // A ladder that crosses most of a row to climb one or two is drawn
+        // as a long plank over the board and reads as a big climb when it is
+        // not; a short snake laid along a row does the same.
+        for (layout in SnakesLayout.entries) {
+            for ((from, to) in layout.ladders + layout.snakes) {
+                val across = abs(Snakes.colOf(from) - Snakes.colOf(to))
+                val up = abs(Snakes.rowOf(from) - Snakes.rowOf(to))
+                assertFalse("$layout $from to $to", across >= 5 && across > 2 * up)
+            }
+        }
+    }
+
     /**
      * The expected number of rolls one player takes to get from the start to
      * the last square, worked out exactly: each square's expectation is one
@@ -65,13 +79,28 @@ class SnakesTest {
     }
 
     @Test
-    fun `every board takes about as long to finish as the classic one`() {
-        // The boards are for variety; none should be a quick or a long game.
+    fun `each board takes as long to finish as its difficulty says`() {
+        // As a share of the classic board's rolls. A normal board is there for
+        // variety, so it stays close; easy and hard ones are clearly apart
+        // from it, but neither so quick it is over at once nor a slog.
+        val bands = mapOf(
+            Difficulty.EASY to 0.45..0.75,
+            Difficulty.NORMAL to 0.88..1.12,
+            Difficulty.HARD to 1.3..1.8,
+        )
         val classic = expectedRolls(SnakesLayout.CLASSIC)
         for (layout in SnakesLayout.entries) {
-            val rolls = expectedRolls(layout)
-            assertTrue("$layout takes $rolls rolls against $classic", abs(rolls - classic) / classic < 0.12)
+            val share = expectedRolls(layout) / classic
+            assertTrue("$layout takes $share of classic's rolls", share in bands.getValue(layout.difficulty))
         }
+    }
+
+    @Test
+    fun `random draws only normal boards, and the boards are listed easiest first`() {
+        assertTrue(SnakesLayout.forRandom.isNotEmpty())
+        assertTrue(SnakesLayout.forRandom.all { it.difficulty == Difficulty.NORMAL })
+        val difficulties = SnakesLayout.entries.map { it.difficulty }
+        assertEquals(difficulties.sorted(), difficulties)
     }
 
     @Test

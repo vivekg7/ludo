@@ -100,18 +100,27 @@ Tokens of the same colour may stack on one square. There is no blocking rule.
 ### Snakes & Ladders
 
 A 10×10 board numbered from 1 in the bottom left, back and forth up to 100 in
-the top left. There are four boards, which differ only in where the snakes and
-ladders are:
+the top left. There are eight boards, which differ only in where the snakes
+and ladders are:
 
-- **Classic** — the Milton Bradley layout, less its ladder on square 1, which is
-  where everyone starts here, so nobody could land on it.
-- **Jungle**, **River** and **Temple** — layouts of our own.
+| Difficulty | Boards                                | Rolls to finish, one player |
+| ---------- | ------------------------------------- | --------------------------- |
+| Easy       | Meadow, Garden                        | about 23                    |
+| Normal     | **Classic**, Jungle, River and Temple | about 40                    |
+| Hard       | Swamp, Volcano                        | about 56–59                 |
 
-The boards are for variety, not difficulty: each takes about as many rolls to
-finish as Classic (about 40 for one player). The expected number of rolls is
-worked out exactly in `SnakesTest`, which fails if any board strays more than
-12% from Classic — so a new or changed layout cannot quietly become a quick
-game or a slog.
+Classic is the Milton Bradley layout, less its ladder on square 1, which is
+where everyone starts here, so nobody could land on it; the rest are our own.
+The easy boards have more and longer ladders and a few short snakes, for small
+children; the hard ones have fewer ladders and long snakes crowded near the
+top. The normal boards other than Classic are there for variety alone.
+
+`SnakesTest` works out each board's expected number of rolls exactly and holds
+it to its band, as a share of Classic's: 0.45–0.75 for easy, 0.88–1.12 for
+normal, 1.3–1.8 for hard. So a new or changed layout cannot quietly drift into
+another difficulty, or turn into a game that is over at once or never ends. It
+also refuses a ladder or snake that lies flat across most of a row, which is
+drawn as a long plank over the board and reads as a big jump when it is not.
 
 - Each player has one token, and everyone starts on square 1.
 - Landing on the foot of a ladder climbs it; landing on a snake's head slides
@@ -138,10 +147,13 @@ there is one, that game's saved game.
   away a half-played game of the other. Ludo kept the save key it had before
   there was a second game, so a game in progress across that update resumes.
 - **Snakes & Ladders adds a board button**, "Board: Classic", under the game
-  buttons. It opens a list of the boards and **Random**, which draws a board
-  for every new game, a rematch included. The pick is remembered. The small
-  board above the title shows the board picked, and with Random it steps
-  through all of them, since no one board is the one that will be played.
+  buttons. It opens a list of the boards, easiest first and marked "easy" or
+  "hard" unless normal, and **Random**, which draws a normal board for every
+  new game, a rematch included. Random leaves out the easy and hard boards
+  because picking one of those is a choice made for who is playing. The pick
+  is remembered. The small board above the title shows the board picked, and
+  with Random it steps through the normal ones, since no one board is the one
+  that will be played.
   The saved game's card names the board it is on — "Jungle · Vivek 34% ·
   Bot 1 21%" — as it may not be the one picked now.
 

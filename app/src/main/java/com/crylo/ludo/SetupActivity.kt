@@ -57,10 +57,12 @@ class SetupActivity : Activity() {
     private val handler = Handler(Looper.getMainLooper())
 
     // With Random picked, no one board is the one that will be played, so
-    // the preview steps through them all rather than suggest one.
+    // the preview steps through every board it might draw rather than
+    // suggest one.
     private val cyclePreview = object : Runnable {
         override fun run() {
-            previewLayout = SnakesLayout.entries[(previewLayout.ordinal + 1) % SnakesLayout.entries.size]
+            val boards = SnakesLayout.forRandom
+            previewLayout = boards[(boards.indexOf(previewLayout) + 1) % boards.size]
             showSnakesPreview()
             handler.postDelayed(this, PREVIEW_CYCLE_MS)
         }
@@ -125,7 +127,7 @@ class SetupActivity : Activity() {
     /** The board picker, offered only for Snakes & Ladders, and the preview that follows it. */
     private fun refreshBoard() {
         boardButton.visibility = if (kind == GameKind.SNAKES) View.VISIBLE else View.GONE
-        boardButton.text = getString(R.string.board_pick, getString(layout?.let(::boardName) ?: R.string.board_random))
+        boardButton.text = getString(R.string.board_pick, layout?.let(::boardLabel) ?: getString(R.string.board_random))
         handler.removeCallbacks(cyclePreview)
         val picked = layout
         if (picked != null) {
@@ -141,10 +143,10 @@ class SetupActivity : Activity() {
         snakesPreview.showState(SnakesState(seats.copyOf(), previewLayout))
     }
 
-    /** Every board by name, then Random; picking one is remembered for the next new game. */
+    /** Every board, easiest first, then Random; picking one is remembered for the next new game. */
     private fun chooseBoard() {
         val boards = SnakesLayout.entries
-        val labels = boards.map { getString(boardName(it)) } + getString(R.string.board_random_detail)
+        val labels = boards.map(::boardLabel) + getString(R.string.board_random_detail)
         val checked = layout?.ordinal ?: boards.size
         AlertDialog.Builder(this)
             .setTitle(R.string.board_title)
@@ -650,10 +652,24 @@ class SetupActivity : Activity() {
     }
 
     private fun boardName(layout: SnakesLayout) = when (layout) {
+        SnakesLayout.MEADOW -> R.string.board_meadow
+        SnakesLayout.GARDEN -> R.string.board_garden
         SnakesLayout.CLASSIC -> R.string.board_classic
         SnakesLayout.JUNGLE -> R.string.board_jungle
         SnakesLayout.RIVER -> R.string.board_river
         SnakesLayout.TEMPLE -> R.string.board_temple
+        SnakesLayout.SWAMP -> R.string.board_swamp
+        SnakesLayout.VOLCANO -> R.string.board_volcano
+    }
+
+    /** The board's name, with how hard it is unless it is a normal one: "Volcano · hard". */
+    private fun boardLabel(layout: SnakesLayout): String {
+        val name = getString(boardName(layout))
+        return when (layout.difficulty) {
+            Difficulty.EASY -> getString(R.string.board_easy, name)
+            Difficulty.NORMAL -> name
+            Difficulty.HARD -> getString(R.string.board_hard, name)
+        }
     }
 
     private companion object {

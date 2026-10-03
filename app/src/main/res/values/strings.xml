@@ -5,12 +5,20 @@
     <string name="game_snakes">Snakes &amp; Ladders</string>
 
     <!-- Snakes & Ladders boards. Each is only a name for a layout, so translate freely. -->
+    <string name="board_meadow">Meadow</string>
+    <string name="board_garden">Garden</string>
     <string name="board_classic">Classic</string>
     <string name="board_jungle">Jungle</string>
     <string name="board_river">River</string>
     <string name="board_temple">Temple</string>
+    <string name="board_swamp">Swamp</string>
+    <string name="board_volcano">Volcano</string>
+    <!-- A board that finishes in about half the rolls: "Meadow · easy". -->
+    <string name="board_easy">%1$s · easy</string>
+    <!-- A board that takes about half as many rolls again: "Volcano · hard". -->
+    <string name="board_hard">%1$s · hard</string>
     <string name="board_random">Random</string>
-    <string name="board_random_detail">Random, a new board each game</string>
+    <string name="board_random_detail">Random, a new normal board each game</string>
     <string name="board_title">Board</string>
     <!-- The setup screen's board button: "Board: Jungle". -->
     <string name="board_pick">Board: %1$s</string>

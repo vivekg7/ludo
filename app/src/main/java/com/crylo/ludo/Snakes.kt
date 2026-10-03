@@ -15,21 +15,48 @@ class Climb(
 }
 
 /**
+ * How long a board's games run against [SnakesLayout.CLASSIC]: a quick game
+ * for small children, about the same, or a long one with more setbacks.
+ */
+enum class Difficulty { EASY, NORMAL, HARD }
+
+/**
  * One Snakes & Ladders board: where its ladders and snakes are. Each is the
  * same 10 × 10 grid; only these differ.
  *
- * The boards other than [CLASSIC] are there for variety, not as harder or
- * easier games, so each is tuned to take about as many rolls to finish as
- * the classic one. A test holds them to that.
+ * A [Difficulty.NORMAL] board is there for variety, so it is tuned to take
+ * about as many rolls to finish as the classic one. An easy board has more
+ * and longer ladders and few short snakes, and finishes in a little over half
+ * the rolls; a hard one has fewer ladders and long snakes crowded near the
+ * top, and takes about half as many again. A test holds each to its band.
+ * Listed easiest first, as the board picker shows them.
  */
 enum class SnakesLayout(
     /** What a save calls the board. Never changed once released, unlike the entry's name. */
     val key: String,
+    val difficulty: Difficulty,
     /** Foot of each ladder to its top. */
     val ladders: Map<Int, Int>,
     /** Head of each snake to its tail. */
     val snakes: Map<Int, Int>,
 ) {
+    MEADOW(
+        "meadow",
+        Difficulty.EASY,
+        ladders = mapOf(
+            3 to 24, 7 to 29, 15 to 46, 22 to 53, 33 to 65, 41 to 62, 52 to 83, 60 to 78, 69 to 92, 76 to 97,
+        ),
+        snakes = mapOf(18 to 6, 38 to 27, 57 to 46, 74 to 66, 88 to 77, 96 to 86),
+    ),
+    GARDEN(
+        "garden",
+        Difficulty.EASY,
+        ladders = mapOf(
+            2 to 21, 10 to 32, 18 to 39, 26 to 57, 37 to 68, 45 to 66, 54 to 75, 63 to 85, 72 to 94, 81 to 99,
+        ),
+        snakes = mapOf(29 to 16, 49 to 36, 59 to 46, 79 to 65, 93 to 84),
+    ),
+
     /**
      * The Milton Bradley layout, less its ladder on square 1: here that is
      * where everyone starts, and a ladder nobody can land on would only be
@@ -37,6 +64,7 @@ enum class SnakesLayout(
      */
     CLASSIC(
         "classic",
+        Difficulty.NORMAL,
         ladders = mapOf(4 to 14, 9 to 31, 21 to 42, 28 to 84, 36 to 44, 51 to 67, 71 to 91, 80 to 100),
         snakes = mapOf(
             16 to 6, 47 to 26, 49 to 11, 56 to 53, 62 to 19, 64 to 60, 87 to 24, 93 to 73, 95 to 75, 98 to 78,
@@ -44,11 +72,13 @@ enum class SnakesLayout(
     ),
     JUNGLE(
         "jungle",
+        Difficulty.NORMAL,
         ladders = mapOf(3 to 22, 8 to 30, 20 to 41, 27 to 56, 40 to 59, 50 to 69, 63 to 81, 72 to 94),
         snakes = mapOf(17 to 7, 34 to 12, 46 to 25, 54 to 33, 62 to 43, 77 to 58, 88 to 67, 92 to 71, 97 to 78),
     ),
     RIVER(
         "river",
+        Difficulty.NORMAL,
         ladders = mapOf(2 to 23, 11 to 33, 19 to 38, 35 to 57, 43 to 64, 61 to 79, 70 to 89, 76 to 96),
         snakes = mapOf(
             25 to 5, 31 to 9, 48 to 29, 52 to 32, 66 to 45, 74 to 55, 84 to 63, 91 to 72, 95 to 85, 98 to 77,
@@ -56,9 +86,26 @@ enum class SnakesLayout(
     ),
     TEMPLE(
         "temple",
+        Difficulty.NORMAL,
         ladders = mapOf(6 to 26, 14 to 37, 24 to 45, 32 to 53, 47 to 68, 58 to 77, 67 to 86, 82 to 99),
         snakes = mapOf(
             21 to 3, 39 to 18, 44 to 16, 55 to 34, 65 to 42, 73 to 51, 85 to 60, 89 to 70, 94 to 75, 97 to 79,
+        ),
+    ),
+    SWAMP(
+        "swamp",
+        Difficulty.HARD,
+        ladders = mapOf(7 to 18, 23 to 35, 32 to 51, 44 to 57, 58 to 74, 70 to 86),
+        snakes = mapOf(
+            14 to 3, 27 to 10, 37 to 19, 48 to 30, 53 to 29, 66 to 38, 83 to 59, 91 to 68, 95 to 76, 98 to 79,
+        ),
+    ),
+    VOLCANO(
+        "volcano",
+        Difficulty.HARD,
+        ladders = mapOf(5 to 16, 12 to 28, 30 to 47, 39 to 58, 50 to 68, 67 to 78, 72 to 86),
+        snakes = mapOf(
+            17 to 4, 34 to 13, 46 to 23, 55 to 31, 69 to 45, 76 to 52, 89 to 66, 93 to 73, 96 to 87, 97 to 79,
         ),
     );
 
@@ -67,6 +114,13 @@ enum class SnakesLayout(
 
     companion object {
         fun of(key: String): SnakesLayout? = entries.firstOrNull { it.key == key }
+
+        /**
+         * The boards Random draws from: the normal ones. Picking an easy or a
+         * hard board is a choice made for who is playing, which a draw
+         * should not make for them.
+         */
+        val forRandom: List<SnakesLayout> = entries.filter { it.difficulty == Difficulty.NORMAL }
     }
 }
 

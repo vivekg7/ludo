@@ -14,10 +14,10 @@ class SnakesActivity : GameActivity<SnakesState, SnakesBoardView>() {
 
     override fun decode(saved: String?) = SnakesState.decode(saved)
 
-    // On the board picked on the setup screen, or with Random picked, one
-    // drawn afresh for every game, a rematch included.
+    // On the board picked on the setup screen, or with Random picked, a
+    // normal one drawn afresh for every game, a rematch included.
     override fun newMatch(seats: Array<Seat>) =
-        SnakesState(seats, Saves.snakesLayout(this) ?: SnakesLayout.entries.random(random))
+        SnakesState(seats, Saves.snakesLayout(this) ?: SnakesLayout.forRandom.random(random))
 
     override fun createBoard() = SnakesBoardView(this)
 
