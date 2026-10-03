@@ -5,7 +5,7 @@ second game. Pass-and-play with up to four people on one device, any seat
 swappable for a bot, and a profile for each person that keeps their wins in
 each game.
 
-Requires **Android 12 (API 31)** or newer. The signed release APK is **76 KB**.
+Requires **Android 12 (API 31)** or newer. The signed release APK is **80 KB**.
 There are no runtime dependencies beyond the
 Kotlin standard library — no AndroidX, no Compose, no Material. The board and
 die are two custom `View`s drawing on a `Canvas`, the sound effects are
