@@ -3,6 +3,17 @@
     <string name="app_name">Ludo</string>
     <string name="game_ludo">Ludo</string>
     <string name="game_snakes">Snakes &amp; Ladders</string>
+
+    <!-- Snakes & Ladders boards. Each is only a name for a layout, so translate freely. -->
+    <string name="board_classic">Classic</string>
+    <string name="board_jungle">Jungle</string>
+    <string name="board_river">River</string>
+    <string name="board_temple">Temple</string>
+    <string name="board_random">Random</string>
+    <string name="board_random_detail">Random, a new board each game</string>
+    <string name="board_title">Board</string>
+    <!-- The setup screen's board button: "Board: Jungle". -->
+    <string name="board_pick">Board: %1$s</string>
     <string name="tagline">Local, offline, pass-and-play</string>
 
     <string name="seat_guest">Guest</string>
@@ -24,6 +35,8 @@
     <string name="seat_bot_caption">played by the phone</string>
     <string name="seat_off_caption">tap to seat someone</string>
     <string name="saved_player">%1$s %2$d%%</string>
+    <!-- A saved Snakes & Ladders game: the board, then its players. -->
+    <string name="saved_on_board">%1$s · %2$s</string>
     <string name="replace_save_title">Start a new game?</string>
     <string name="replace_save_detail">The saved game will be lost: %1$s</string>
     <string name="replace_save_confirm">Start new game</string>

@@ -106,10 +106,13 @@ class SnakesBoardView(context: Context) : View(context), TableBoard<SnakesState>
 
     /**
      * Each snake's body from head to tail, as x, y pairs in squares, worked
-     * out once: a wave along the line from its head to its tail. A token
-     * sliding down a snake follows the same points.
+     * out once per board: a wave along the line from its head to its tail. A
+     * token sliding down a snake follows the same points.
      */
-    private val bodies: Map<Int, FloatArray> = Snakes.snakes.mapValues { (head, tail) -> body(head, tail) }
+    private var bodies: Map<Int, FloatArray> = emptyMap()
+
+    /** The board [bodies] were worked out for. */
+    private var bodiesOf: SnakesLayout? = null
 
     // Scratch space, reused to keep onDraw allocation-free.
     private val here = FloatArray(2)
@@ -134,6 +137,10 @@ class SnakesBoardView(context: Context) : View(context), TableBoard<SnakesState>
 
     override fun showState(newState: SnakesState) {
         state = newState
+        if (newState.layout != bodiesOf) {
+            bodiesOf = newState.layout
+            bodies = newState.layout.snakes.mapValues { (head, tail) -> body(head, tail) }
+        }
         invalidate()
     }
 
@@ -276,7 +283,7 @@ class SnakesBoardView(context: Context) : View(context), TableBoard<SnakesState>
         canvas.save()
         canvas.translate(0f, boardTop)
         drawSquares(canvas)
-        drawLadders(canvas)
+        drawLadders(canvas, game.layout)
         drawSnakes(canvas)
         drawTokens(canvas, game)
         if (!bare) drawEmojis(canvas, game, now)
@@ -319,8 +326,8 @@ class SnakesBoardView(context: Context) : View(context), TableBoard<SnakesState>
     }
 
     /** Two rails from foot to top, with a rung every so often between them. */
-    private fun drawLadders(canvas: Canvas) {
-        for ((foot, top) in Snakes.ladders) {
+    private fun drawLadders(canvas: Canvas, layout: SnakesLayout) {
+        for ((foot, top) in layout.ladders) {
             val x1 = centreX(foot)
             val y1 = centreY(foot)
             val x2 = centreX(top)

@@ -28,15 +28,50 @@ class SnakesTest {
     }
 
     @Test
-    fun `ladders go up, snakes go down, and none starts where another ends`() {
-        for ((foot, top) in Snakes.ladders) assertTrue("ladder $foot", top > foot)
-        for ((head, tail) in Snakes.snakes) assertTrue("snake $head", tail < head)
-        val starts = Snakes.ladders.keys + Snakes.snakes.keys
-        val ends = Snakes.ladders.values + Snakes.snakes.values
-        assertEquals("one thing per square", Snakes.ladders.size + Snakes.snakes.size, starts.size)
-        assertTrue("a jump never lands on another jump", ends.none { it in starts })
-        assertFalse("nothing on the start square", Snakes.START in starts)
-        assertFalse("no snake on the last square", Snakes.FINISH in starts)
+    fun `on every board ladders go up, snakes go down, and none starts where another ends`() {
+        for (layout in SnakesLayout.entries) {
+            for ((foot, top) in layout.ladders) assertTrue("$layout ladder $foot", top > foot)
+            for ((head, tail) in layout.snakes) assertTrue("$layout snake $head", tail < head)
+            val starts = layout.ladders.keys + layout.snakes.keys
+            val ends = layout.ladders.values + layout.snakes.values
+            assertEquals("$layout: one thing per square", layout.ladders.size + layout.snakes.size, starts.size)
+            assertTrue("$layout: a jump never lands on another jump", ends.none { it in starts })
+            assertFalse("$layout: nothing on the start square", Snakes.START in starts)
+            assertFalse("$layout: no snake on the last square", Snakes.FINISH in starts)
+        }
+        assertEquals("keys are unique", SnakesLayout.entries.size, SnakesLayout.entries.map { it.key }.toSet().size)
+    }
+
+    /**
+     * The expected number of rolls one player takes to get from the start to
+     * the last square, worked out exactly: each square's expectation is one
+     * roll plus the average over the six faces of where that face leads, and
+     * repeating that settles on the answer. Sixes rolling again changes who
+     * rolls, not how many rolls the token needs, so it is left out.
+     */
+    private fun expectedRolls(layout: SnakesLayout): Double {
+        val expected = DoubleArray(Snakes.FINISH + 1)
+        repeat(5000) {
+            for (square in Snakes.FINISH - 1 downTo Snakes.START) {
+                var total = 0.0
+                for (face in 1..6) {
+                    val target = Snakes.targetOf(square, face)
+                    total += expected[if (target < 0) square else layout.jumpFrom(target)]
+                }
+                expected[square] = 1 + total / 6
+            }
+        }
+        return expected[Snakes.START]
+    }
+
+    @Test
+    fun `every board takes about as long to finish as the classic one`() {
+        // The boards are for variety; none should be a quick or a long game.
+        val classic = expectedRolls(SnakesLayout.CLASSIC)
+        for (layout in SnakesLayout.entries) {
+            val rolls = expectedRolls(layout)
+            assertTrue("$layout takes $rolls rolls against $classic", abs(rolls - classic) / classic < 0.12)
+        }
     }
 
     @Test
@@ -125,11 +160,33 @@ class SnakesTest {
         state.profiles[0] = 3
 
         val restored = requireNotNull(SnakesState.decode(state.encode()))
+        assertEquals(SnakesLayout.CLASSIC, restored.layout)
         assertArrayEquals(state.squares, restored.squares)
         assertEquals(1, restored.current)
         assertEquals(5, restored.die)
         assertEquals(1, restored.sixStreak)
         assertArrayEquals(intArrayOf(3, 0, 0, 0), restored.profiles)
+
+        val river = SnakesState(state.seats, SnakesLayout.RIVER)
+        assertEquals(SnakesLayout.RIVER, SnakesState.decode(river.encode())?.layout)
+    }
+
+    @Test
+    fun `a game saved before there were boards comes back on the classic one`() {
+        val restored = requireNotNull(SnakesState.decode("1|1,2,0,0|57,12,1,1|1|5|1|-1|3,0,0,0"))
+        assertEquals(SnakesLayout.CLASSIC, restored.layout)
+        assertEquals(57, restored.squares[0])
+        assertArrayEquals(intArrayOf(3, 0, 0, 0), restored.profiles)
+    }
+
+    @Test
+    fun `a board's own rules decide where a token ends up`() {
+        val state = SnakesState(arrayOf(Seat.HUMAN, Seat.BOT, Seat.NONE, Seat.NONE), SnakesLayout.JUNGLE)
+        state.current = 0
+        state.squares[0] = 1
+        assertEquals(22, Snakes.apply(state, 2).to)          // Jungle's ladder on 3
+        state.squares[0] = 2
+        assertEquals(4, Snakes.apply(state, 2).to)           // Classic's ladder on 4 is not here
     }
 
     @Test
@@ -137,7 +194,9 @@ class SnakesTest {
         assertNull(SnakesState.decode(null))
         assertNull(SnakesState.decode("1|1,2,0,0|0,1,1,1|0|0|0|-1|0,0,0,0"))     // square 0
         assertNull(SnakesState.decode("1|1,2,0,0|1,1,1|0|0|0|-1|0,0,0,0"))       // three squares
-        assertNull(SnakesState.decode("2|1,2,0,0|1,1,1,1|0|0|0|-1|0,0,0,0"))     // unknown version
+        assertNull(SnakesState.decode("3|1,2,0,0|1,1,1,1|0|0|0|-1|0,0,0,0|classic"))  // unknown version
+        assertNull(SnakesState.decode("2|1,2,0,0|1,1,1,1|0|0|0|-1|0,0,0,0|moon"))     // unknown board
+        assertNull(SnakesState.decode("2|1,2,0,0|1,1,1,1|0|0|0|-1|0,0,0,0"))          // board missing
         // A Ludo save is not a Snakes & Ladders one.
         assertNull(SnakesState.decode(GameState(game().seats).encode()))
     }

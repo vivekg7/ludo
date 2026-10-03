@@ -15,10 +15,66 @@ class Climb(
 }
 
 /**
- * A game of Snakes & Ladders: the shared [Match] plus the square each seat's
- * one token stands on.
+ * One Snakes & Ladders board: where its ladders and snakes are. Each is the
+ * same 10 × 10 grid; only these differ.
+ *
+ * The boards other than [CLASSIC] are there for variety, not as harder or
+ * easier games, so each is tuned to take about as many rolls to finish as
+ * the classic one. A test holds them to that.
  */
-class SnakesState(seats: Array<Seat>) : Match(seats) {
+enum class SnakesLayout(
+    /** What a save calls the board. Never changed once released, unlike the entry's name. */
+    val key: String,
+    /** Foot of each ladder to its top. */
+    val ladders: Map<Int, Int>,
+    /** Head of each snake to its tail. */
+    val snakes: Map<Int, Int>,
+) {
+    /**
+     * The Milton Bradley layout, less its ladder on square 1: here that is
+     * where everyone starts, and a ladder nobody can land on would only be
+     * decoration.
+     */
+    CLASSIC(
+        "classic",
+        ladders = mapOf(4 to 14, 9 to 31, 21 to 42, 28 to 84, 36 to 44, 51 to 67, 71 to 91, 80 to 100),
+        snakes = mapOf(
+            16 to 6, 47 to 26, 49 to 11, 56 to 53, 62 to 19, 64 to 60, 87 to 24, 93 to 73, 95 to 75, 98 to 78,
+        ),
+    ),
+    JUNGLE(
+        "jungle",
+        ladders = mapOf(3 to 22, 8 to 30, 20 to 41, 27 to 56, 40 to 59, 50 to 69, 63 to 81, 72 to 94),
+        snakes = mapOf(17 to 7, 34 to 12, 46 to 25, 54 to 33, 62 to 43, 77 to 58, 88 to 67, 92 to 71, 97 to 78),
+    ),
+    RIVER(
+        "river",
+        ladders = mapOf(2 to 23, 11 to 33, 19 to 38, 35 to 57, 43 to 64, 61 to 79, 70 to 89, 76 to 96),
+        snakes = mapOf(
+            25 to 5, 31 to 9, 48 to 29, 52 to 32, 66 to 45, 74 to 55, 84 to 63, 91 to 72, 95 to 85, 98 to 77,
+        ),
+    ),
+    TEMPLE(
+        "temple",
+        ladders = mapOf(6 to 26, 14 to 37, 24 to 45, 32 to 53, 47 to 68, 58 to 77, 67 to 86, 82 to 99),
+        snakes = mapOf(
+            21 to 3, 39 to 18, 44 to 16, 55 to 34, 65 to 42, 73 to 51, 85 to 60, 89 to 70, 94 to 75, 97 to 79,
+        ),
+    );
+
+    /** Where a token that walks onto [square] ends up: up a ladder, down a snake, or there. */
+    fun jumpFrom(square: Int): Int = ladders[square] ?: snakes[square] ?: square
+
+    companion object {
+        fun of(key: String): SnakesLayout? = entries.firstOrNull { it.key == key }
+    }
+}
+
+/**
+ * A game of Snakes & Ladders: the shared [Match], the board it is played on,
+ * and the square each seat's one token stands on.
+ */
+class SnakesState(seats: Array<Seat>, val layout: SnakesLayout = SnakesLayout.CLASSIC) : Match(seats) {
 
     override val kind = GameKind.SNAKES
 
@@ -33,18 +89,34 @@ class SnakesState(seats: Array<Seat>) : Match(seats) {
 
     override fun percent(player: Int) = (squares[player] - Snakes.START) * 100 / (Snakes.FINISH - Snakes.START)
 
-    companion object {
-        private const val SAVE_VERSION = 1
+    override fun extraFields() = listOf(layout.key)
 
-        fun decode(saved: String?): SnakesState? = Match.decode(saved, ::SnakesState) {
-            if (it == SAVE_VERSION) Match.FIELDS else null
+    companion object {
+        private const val SAVE_VERSION = 2
+
+        // Version 1 predates there being more than one board, so its game
+        // was on the classic one; version 2 adds the board's key. A key this
+        // build does not know refuses the save, like any other damage.
+        fun decode(saved: String?): SnakesState? = Match.decode(
+            saved,
+            { seats, extra ->
+                val layout = if (extra.isEmpty()) SnakesLayout.CLASSIC else SnakesLayout.of(extra[0])
+                layout?.let { SnakesState(seats, it) }
+            },
+        ) {
+            when (it) {
+                1 -> Match.FIELDS
+                SAVE_VERSION -> Match.FIELDS + 1
+                else -> null
+            }
         }
     }
 }
 
 /**
- * The board and rules of Snakes & Ladders, as pure functions over
- * [SnakesState] like [Rules] is for Ludo.
+ * The grid and rules of Snakes & Ladders, as pure functions over
+ * [SnakesState] like [Rules] is for Ludo. Where the snakes and ladders are is
+ * the game's [SnakesLayout].
  *
  * The board is 10 × 10, numbered from 1 in the bottom left, left to right
  * along the bottom row and back the other way along the next, up to 100 in
@@ -59,20 +131,6 @@ object Snakes {
     const val START = 1
     const val FINISH = GRID * GRID
 
-    /**
-     * Foot of each ladder to its top. The classic Milton Bradley layout, less
-     * its ladder on square 1: here that is where everyone starts, and a ladder
-     * nobody can land on would only be decoration.
-     */
-    val ladders: Map<Int, Int> = mapOf(
-        4 to 14, 9 to 31, 21 to 42, 28 to 84, 36 to 44, 51 to 67, 71 to 91, 80 to 100,
-    )
-
-    /** Head of each snake to its tail, from the same layout. */
-    val snakes: Map<Int, Int> = mapOf(
-        16 to 6, 47 to 26, 49 to 11, 56 to 53, 62 to 19, 64 to 60, 87 to 24, 93 to 73, 95 to 75, 98 to 78,
-    )
-
     /** Where a token on [square] walks to with this roll, or -1 if it would overshoot. */
     fun targetOf(square: Int, die: Int): Int = when {
         die !in 1..6 -> -1
@@ -80,16 +138,13 @@ object Snakes {
         else -> square + die
     }
 
-    /** Where a token that walks onto [square] ends up: up a ladder, down a snake, or there. */
-    fun jumpFrom(square: Int): Int = ladders[square] ?: snakes[square] ?: square
-
     /** Plays the current player's roll in place and reports what it did; the roll must be playable. */
     fun apply(state: SnakesState, die: Int): Climb {
         val player = state.current
         val from = state.squares[player]
         val landed = targetOf(from, die)
         require(landed > 0) { "illegal move: square $from with die $die" }
-        val to = jumpFrom(landed)
+        val to = state.layout.jumpFrom(landed)
         state.squares[player] = to
         if (to == FINISH) state.winner = player
         return Climb(player, from, landed, to, extraTurn = die == 6 && to != FINISH)

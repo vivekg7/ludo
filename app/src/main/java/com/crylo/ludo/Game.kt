@@ -52,7 +52,7 @@ class GameState(seats: Array<Seat>) : Match(seats) {
 
         // Version 1 predates profiles and is otherwise identical, so a game
         // left in progress across that update still resumes, with guests.
-        fun decode(saved: String?): GameState? = Match.decode(saved, ::GameState) {
+        fun decode(saved: String?): GameState? = Match.decode(saved, { seats, _ -> GameState(seats) }) {
             when (it) {
                 1 -> Match.FIELDS - 1
                 SAVE_VERSION -> Match.FIELDS

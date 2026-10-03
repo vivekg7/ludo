@@ -21,7 +21,8 @@ enum class GameKind {
  * them needs a copy per game.
  *
  * Each game adds its own [positions], one integer per token, and the whole
- * thing saves as one line: `version|seats|positions|current|die|streak|winner|profiles`.
+ * thing saves as one line: `version|seats|positions|current|die|streak|winner|profiles`,
+ * followed by any [extraFields] the game keeps besides.
  */
 abstract class Match(val seats: Array<Seat>) {
 
@@ -57,6 +58,9 @@ abstract class Match(val seats: Array<Seat>) {
     /** How far along [player] is out of 100, rounded down so 100 means won. */
     abstract fun percent(player: Int): Int
 
+    /** Fields this game saves after the shared ones; none of them may hold a "|". */
+    protected open fun extraFields(): List<String> = emptyList()
+
     /**
      * Occupied seats in finishing order: the winner, if there is one, then the
      * rest by [score]. Seat order breaks a tie, which [sameStanding] lets a
@@ -83,6 +87,7 @@ abstract class Match(val seats: Array<Seat>) {
         append('|').append(winner)
         append('|')
         profiles.joinTo(this, ",")
+        for (field in extraFields()) append('|').append(field)
     }
 
     companion object {
@@ -91,12 +96,17 @@ abstract class Match(val seats: Array<Seat>) {
 
         /**
          * Rebuilds a game from [encode]'s string, or null if it is damaged:
-         * [make] builds an empty game for the saved seats, and [fieldsFor]
+         * [make] builds an empty game for the saved seats and the game's own
+         * [extraFields], or returns null if those are damaged, and [fieldsFor]
          * says how many fields a save of a given version has, or null for a
          * version this build does not know. A save with fewer than [FIELDS]
          * predates profiles, and its human seats come back as guests.
          */
-        fun <M : Match> decode(saved: String?, make: (Array<Seat>) -> M, fieldsFor: (Int) -> Int?): M? {
+        fun <M : Match> decode(
+            saved: String?,
+            make: (seats: Array<Seat>, extra: List<String>) -> M?,
+            fieldsFor: (Int) -> Int?,
+        ): M? {
             val parts = saved?.split('|') ?: return null
             val fields = parts[0].toIntOrNull()?.let(fieldsFor) ?: return null
             if (parts.size != fields) return null
@@ -105,7 +115,7 @@ abstract class Match(val seats: Array<Seat>) {
                 if (seats.size != Board.PLAYERS) return null
                 if (seats.count { it != Seat.NONE } < 2) return null
 
-                make(seats).apply {
+                make(seats, parts.drop(FIELDS))?.apply {
                     val values = parts[2].split(',').map { it.toInt() }
                     if (values.size != positions.size) return null
                     if (values.any { it !in positionRange }) return null
@@ -116,7 +126,7 @@ abstract class Match(val seats: Array<Seat>) {
                     sixStreak = parts[5].toInt().coerceIn(0, Turns.SIX_STREAK_LIMIT - 1)
                     winner = parts[6].toInt().let { if (it in 0 until Board.PLAYERS) it else -1 }
                     if (seats[current] == Seat.NONE) current = seats.indexOfFirst { it != Seat.NONE }
-                    if (fields == FIELDS) {
+                    if (fields >= FIELDS) {
                         val ids = parts[7].split(',').map { it.toInt() }
                         if (ids.size != Board.PLAYERS) return null
                         for (p in 0 until Board.PLAYERS) {

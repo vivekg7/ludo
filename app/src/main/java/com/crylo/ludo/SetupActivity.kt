@@ -5,6 +5,8 @@ import android.app.AlertDialog
 import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.text.InputFilter
 import android.text.InputType
 import android.text.TextUtils
@@ -23,8 +25,9 @@ import android.widget.ScrollView
 import android.widget.TextView
 
 /**
- * Game and seat picker: which game, who is playing which colour, the profiles
- * they play as, and a way back into that game's saved game.
+ * Game and seat picker: which game, and for Snakes & Ladders which board, who
+ * is playing which colour, the profiles they play as, and a way back into
+ * that game's saved game.
  */
 class SetupActivity : Activity() {
 
@@ -45,9 +48,28 @@ class SetupActivity : Activity() {
     /** The picked game's saved game, if there is one, as of the last time this screen came back. */
     private var saved: Match? = null
 
+    /** The Snakes & Ladders board picked for new games, or null for Random. */
+    private var layout: SnakesLayout? = SnakesLayout.CLASSIC
+
+    /** The board the Snakes & Ladders preview shows: the one picked, or with Random, each in turn. */
+    private var previewLayout = SnakesLayout.CLASSIC
+
+    private val handler = Handler(Looper.getMainLooper())
+
+    // With Random picked, no one board is the one that will be played, so
+    // the preview steps through them all rather than suggest one.
+    private val cyclePreview = object : Runnable {
+        override fun run() {
+            previewLayout = SnakesLayout.entries[(previewLayout.ordinal + 1) % SnakesLayout.entries.size]
+            showSnakesPreview()
+            handler.postDelayed(this, PREVIEW_CYCLE_MS)
+        }
+    }
+
     private lateinit var preview: BoardView
     private lateinit var snakesPreview: SnakesBoardView
     private val kindButtons = HashMap<GameKind, Button>()
+    private lateinit var boardButton: Button
     private lateinit var savedSection: View
     private lateinit var savedSummary: TextView
     private lateinit var startButton: Button
@@ -57,6 +79,7 @@ class SetupActivity : Activity() {
         super.onCreate(savedInstanceState)
         Saves.loadLineup(this, seats, seatProfiles)
         kind = Saves.kind(this)
+        layout = Saves.snakesLayout(this)
         setContentView(buildUi())
     }
 
@@ -66,6 +89,11 @@ class SetupActivity : Activity() {
         // looked, and a finished game has changed the profiles' records.
         profiles = Saves.profiles(this)
         refreshKind()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        handler.removeCallbacks(cyclePreview)
     }
 
     private fun pick(picked: GameKind) {
@@ -89,6 +117,45 @@ class SetupActivity : Activity() {
         saved = Saves.load(this, kind)
         refreshSaved()
         refreshSeats()
+        refreshBoard()
+    }
+
+    // --- Snakes & Ladders board ----------------------------------------------
+
+    /** The board picker, offered only for Snakes & Ladders, and the preview that follows it. */
+    private fun refreshBoard() {
+        boardButton.visibility = if (kind == GameKind.SNAKES) View.VISIBLE else View.GONE
+        boardButton.text = getString(R.string.board_pick, getString(layout?.let(::boardName) ?: R.string.board_random))
+        handler.removeCallbacks(cyclePreview)
+        val picked = layout
+        if (picked != null) {
+            previewLayout = picked
+        } else if (kind == GameKind.SNAKES) {
+            handler.postDelayed(cyclePreview, PREVIEW_CYCLE_MS)
+        }
+        showSnakesPreview()
+    }
+
+    private fun showSnakesPreview() {
+        // A copy, so the preview's state is not changed under it by the next pick.
+        snakesPreview.showState(SnakesState(seats.copyOf(), previewLayout))
+    }
+
+    /** Every board by name, then Random; picking one is remembered for the next new game. */
+    private fun chooseBoard() {
+        val boards = SnakesLayout.entries
+        val labels = boards.map { getString(boardName(it)) } + getString(R.string.board_random_detail)
+        val checked = layout?.ordinal ?: boards.size
+        AlertDialog.Builder(this)
+            .setTitle(R.string.board_title)
+            .setSingleChoiceItems(labels.toTypedArray(), checked) { dialog, which ->
+                layout = boards.getOrNull(which)
+                Saves.setSnakesLayout(this, layout)
+                refreshBoard()
+                dialog.dismiss()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun start() {
@@ -126,12 +193,16 @@ class SetupActivity : Activity() {
         Style.restyle(startButton, if (game != null) Style.Kind.SECONDARY else Style.Kind.PRIMARY)
     }
 
-    /** "Vivek 34% · Jyoti 21% · Bot 1 12%", leader first. */
+    /**
+     * "Vivek 34% · Jyoti 21% · Bot 1 12%", leader first, after the board's
+     * name for Snakes & Ladders, which may not be the board picked now.
+     */
     private fun summaryOf(game: Match): String {
         val names = Profiles.seatNames(game.seats, game.profiles, profiles) { getString(R.string.bot_name, it) }
-        return game.standings().joinToString(" · ") { player ->
+        val players = game.standings().joinToString(" · ") { player ->
             getString(R.string.saved_player, names[player], game.percent(player))
         }
+        return if (game is SnakesState) getString(R.string.saved_on_board, getString(boardName(game.layout)), players) else players
     }
 
     // --- seats -------------------------------------------------------------
@@ -164,7 +235,7 @@ class SetupActivity : Activity() {
 
         // A copy, so the preview's state is not changed under it by the next pick.
         preview.showState(GameState(seats.copyOf()))
-        snakesPreview.showState(SnakesState(seats.copyOf()))
+        showSnakesPreview()
         Saves.saveLineup(this, seats, seatProfiles)
     }
 
@@ -421,6 +492,11 @@ class SetupActivity : Activity() {
         }
         form.addView(games, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(12) })
 
+        boardButton = Style.button(this, "", Style.Kind.SECONDARY).apply {
+            setOnClickListener { chooseBoard() }
+        }
+        form.addView(boardButton, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(8) })
+
         savedSection = buildSavedSection()
         form.addView(savedSection, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
 
@@ -573,6 +649,13 @@ class SetupActivity : Activity() {
         GameKind.SNAKES -> R.string.game_snakes
     }
 
+    private fun boardName(layout: SnakesLayout) = when (layout) {
+        SnakesLayout.CLASSIC -> R.string.board_classic
+        SnakesLayout.JUNGLE -> R.string.board_jungle
+        SnakesLayout.RIVER -> R.string.board_river
+        SnakesLayout.TEMPLE -> R.string.board_temple
+    }
+
     private companion object {
         /** Seats row by row as their yards sit on the board: Red, Green over Blue, Yellow. */
         val BOARD_ROWS = arrayOf(intArrayOf(0, 1), intArrayOf(3, 2))
@@ -580,5 +663,8 @@ class SetupActivity : Activity() {
         const val EMPTY_ALPHA = 0.5f
 
         const val PREVIEW_DP = 112
+
+        /** How long the preview shows each board while Random is picked. */
+        const val PREVIEW_CYCLE_MS = 1500L
     }
 }

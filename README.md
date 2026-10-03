@@ -100,9 +100,18 @@ Tokens of the same colour may stack on one square. There is no blocking rule.
 ### Snakes & Ladders
 
 A 10×10 board numbered from 1 in the bottom left, back and forth up to 100 in
-the top left, with the classic Milton Bradley snakes and ladders — less its
-ladder on square 1, which is where everyone starts here, so nobody could land
-on it.
+the top left. There are four boards, which differ only in where the snakes and
+ladders are:
+
+- **Classic** — the Milton Bradley layout, less its ladder on square 1, which is
+  where everyone starts here, so nobody could land on it.
+- **Jungle**, **River** and **Temple** — layouts of our own.
+
+The boards are for variety, not difficulty: each takes about as many rolls to
+finish as Classic (about 40 for one player). The expected number of rolls is
+worked out exactly in `SnakesTest`, which fails if any board strays more than
+12% from Classic — so a new or changed layout cannot quietly become a quick
+game or a slog.
 
 - Each player has one token, and everyone starts on square 1.
 - Landing on the foot of a ladder climbs it; landing on a snake's head slides
@@ -128,6 +137,13 @@ there is one, that game's saved game.
 - **Each game has its own saved game.** Starting a game of one does not throw
   away a half-played game of the other. Ludo kept the save key it had before
   there was a second game, so a game in progress across that update resumes.
+- **Snakes & Ladders adds a board button**, "Board: Classic", under the game
+  buttons. It opens a list of the boards and **Random**, which draws a board
+  for every new game, a rematch included. The pick is remembered. The small
+  board above the title shows the board picked, and with Random it steps
+  through all of them, since no one board is the one that will be played.
+  The saved game's card names the board it is on — "Jungle · Vivek 34% ·
+  Bot 1 21%" — as it may not be the one picked now.
 
 - **A saved game comes first.** It is an amber card above the lineup, listing
   its players leader first with how far each has got — "Vivek 34% · Jyoti 21%" —
@@ -205,6 +221,12 @@ The profiles save starts with a `#2` version line and holds both records on
 each line. A save without that line is from before Snakes & Ladders, and its
 one record per profile comes back as the Ludo record, so nobody's wins are
 lost to the update.
+
+The Snakes & Ladders save format is at version 2, which adds the board's key
+(`classic`, `jungle`, …) as a last field. A version 1 save, from before there
+were boards, resumes on Classic, the only board there was. The keys are stored
+rather than the boards' order, so the list can be reordered or added to
+without moving anyone's saved game to another board.
 
 ## Game screen
 
@@ -432,7 +454,7 @@ cannot be captured, so those tokens can never collide with anything.
 | `Match.kt`            | `Match`, the state every game shares, and its save encoding; `Turns`         |
 | `Board.kt`            | Ludo board geometry: the ring, home runs, yards, safe squares                |
 | `Game.kt`             | `GameState` and `Rules` — the whole Ludo variant                             |
-| `Snakes.kt`           | `SnakesState` and `Snakes` — the Snakes & Ladders board and rules            |
+| `Snakes.kt`           | `SnakesLayout`, `SnakesState` and `Snakes` — the boards and the rules        |
 | `Profile.kt`          | Profiles: names, a win record per game, and their save encoding              |
 | `Bot.kt`              | One-ply heuristic Ludo opponent                                              |
 | `BoardView.kt`        | Draws the Ludo board, tokens and seat names; turns taps into choices         |

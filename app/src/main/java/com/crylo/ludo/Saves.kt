@@ -5,7 +5,7 @@ import android.content.Context
 /**
  * Everything the game keeps between launches, in SharedPreferences: a game in
  * progress for each kind of game, the profiles, who last sat where, which game
- * was picked last, whether sound is on, which way the names above the board
+ * and which Snakes & Ladders board were picked last, whether sound is on, which way the names above the board
  * face, and whether the board reacts to captures. Each encodes to a short
  * string, so there is nothing here worth a database.
  */
@@ -17,6 +17,8 @@ object Saves {
     private const val KEY_LUDO = "game"
     private const val KEY_SNAKES = "game_snakes"
     private const val KEY_KIND = "kind"
+    private const val KEY_SNAKES_LAYOUT = "snakes_layout"
+    private const val RANDOM_LAYOUT = "random"
     private const val KEY_PROFILES = "profiles"
     private const val KEY_NEXT_PROFILE_ID = "next_profile_id"
     private const val KEY_LINEUP = "lineup"
@@ -57,6 +59,19 @@ object Saves {
 
     fun setKind(context: Context, kind: GameKind) {
         prefs(context).edit().putInt(KEY_KIND, kind.ordinal).apply()
+    }
+
+    /**
+     * The Snakes & Ladders board picked for new games, or null for a board
+     * drawn at random each game. The classic board until one is picked.
+     */
+    fun snakesLayout(context: Context): SnakesLayout? {
+        val key = prefs(context).getString(KEY_SNAKES_LAYOUT, null) ?: return SnakesLayout.CLASSIC
+        return if (key == RANDOM_LAYOUT) null else SnakesLayout.of(key) ?: SnakesLayout.CLASSIC
+    }
+
+    fun setSnakesLayout(context: Context, layout: SnakesLayout?) {
+        prefs(context).edit().putString(KEY_SNAKES_LAYOUT, layout?.key ?: RANDOM_LAYOUT).apply()
     }
 
     // --- profiles ----------------------------------------------------------
