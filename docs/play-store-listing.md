@@ -92,9 +92,13 @@ shows a download size that varies by device.
 | Feature graphic       | 1024 × 500 JPEG  | `local/play-store/feature-graphic-1024x500.jpg` |
 | Phone screenshots (6) | 1080 × 1920 JPEG | `local/play-store/screenshots/`                 |
 
-`local/` is gitignored, so these exist only on the machine that made them. The
-designs are in the Paper file "Ludo — App Icon". Re-export from there rather
-than editing the images.
+`local/` is gitignored, so these exist only on the machine that made them. They
+are the only copies: the design file they were exported from has been deleted,
+so back them up off that machine. The icon is the exception. Its source is the
+vector drawables in `app/src/main/res/drawable/`, so a new 512 px icon can be
+drawn from those. A changed headline or screenshot means rebuilding that panel:
+1080 × 1920, one player colour as the background, a two-line Roboto Black
+headline at 84 px, and the screenshot in a phone frame 640 px wide.
 
 The screenshots, in order, each with a player colour behind it:
 
