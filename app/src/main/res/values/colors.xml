@@ -2,6 +2,8 @@
 <resources>
     <color name="board_bg">#FF12161C</color>
     <color name="accent">#FFFFB300</color>
+    <!-- Style.SURFACE: the panels on the setup screen, and its dialogs. -->
+    <color name="surface">#FF1D232C</color>
     <!-- The app's own ink, so the icon matches the screen it opens on. -->
     <color name="ic_launcher_bg">#FF12161C</color>
 </resources>

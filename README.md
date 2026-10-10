@@ -186,6 +186,9 @@ there is one, that game's saved game.
   yards with one token each, the home runs and the centre, on the app's own
   ink. An earlier icon drew every square and all sixteen tokens and blurred
   into noise at launcher size. A one-colour version serves themed icons.
+- **Dialogs (seat picker, profiles, confirmations) take the app's panel
+  colour and rounded corners** through `LudoDialog` in `themes.xml`; the
+  platform default is a flat grey that matches nothing else on screen.
 - **The ⚙ beside the title opens [Settings](#settings).**
 - The screen scrolls when it does not fit, on a short phone or at a large font
   size, and is centred otherwise.
