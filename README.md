@@ -94,6 +94,13 @@ against that: a dirty working tree archives into `v1.0-dirty-g1a2b3c4/` rather t
 release's folder, an existing target is never overwritten without `--force`, and an APK
 that came out unsigned is refused outright rather than archived under a release name.
 
+### Publishing to Google Play
+
+The store listing (name, descriptions, graphics, policy answers) and each
+release's notes are in [docs/play-store-listing.md](docs/play-store-listing.md).
+Update it with every release, and whenever the listing changes in the Play
+Console.
+
 ## Rules
 
 ### Ludo
