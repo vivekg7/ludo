@@ -413,6 +413,12 @@ The rules are in `res/xml/data_extraction_rules.xml`. The older
 `fullBackupContent` attribute is not set: on Android 12 and up, the minimum
 here, `dataExtractionRules` replaces it.
 
+The [privacy policy](PRIVACY.md), which the Play Store listing links to,
+promises exactly this: no permissions, no network, data on the device only, and
+device transfer as the one way it leaves. Adding a permission, a network call,
+a third-party SDK or cloud backup breaks that promise, so the policy has to
+change in the same commit, with a new effective date.
+
 ## Sound
 
 The game screen plays a rattle and a thud for each roll, a tap for every square
