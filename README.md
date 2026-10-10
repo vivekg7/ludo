@@ -54,9 +54,16 @@ Two packaging choices are deliberate and pull in opposite directions:
 
 ### Archiving a release
 
-`scripts/archive-apk.sh` builds the release APK and copies it into `local/` named from
-the version in the built manifest, alongside a `.sha256`, the R8 `mapping.txt` for that
-build, and the signer fingerprint printed for confirmation.
+`scripts/archive-apk.sh` builds the release APK and copies it into a folder of its own
+under `local/releases/`, named from the version in the built manifest, alongside a
+`.sha256` and the R8 `mapping.txt` for that build. It also prints the signer
+fingerprint for confirmation.
+
+```text
+local/releases/v1.7/
+  ludo-v1.7.aab   ludo-v1.7.aab.sha256   ludo-v1.7.aab.mapping.txt
+  ludo-v1.7.apk   ludo-v1.7.apk.sha256   ludo-v1.7.apk.mapping.txt
+```
 
 ```sh
 ./scripts/archive-apk.sh          # build, verify, archive
@@ -64,26 +71,27 @@ build, and the signer fingerprint printed for confirmation.
 ./scripts/archive-apk.sh --force  # replace an existing archive
 ```
 
-`--aab` runs `bundleRelease` and archives `ludo-v1.0.aab` the same way, with its own
-`.sha256` and mapping. Play accepts only bundles, so this is the file to upload there; the
-APK stays the file to sideload. A bundle needs different tools to read: its manifest is
+`--aab` runs `bundleRelease` and archives `ludo-v1.0.aab` into the same folder, with its
+own `.sha256` and mapping. Play accepts only bundles, so this is the file to upload
+there; the APK stays the file to sideload. A bundle needs different tools to read: its manifest is
 protobuf rather than binary XML, so the version comes from `aapt2 dump xmltree` instead
 of `aapt dump badging`. It is signed as a plain JAR, so the certificate comes from
 `keytool -printcert -jarfile` instead of `apksigner`. With Play App Signing that
 certificate is the upload key's: Play re-signs what it delivers with the app signing key
 it holds.
 
-All three files share the `ludo-v1.0.apk` prefix, so one release is removed as a unit
-and no mapping can be left behind to be matched against the wrong APK later. Keeping the
-mapping matters because `release` minifies: without it, an obfuscated stack trace from a
-shipped build can never be read back, and the file is written under `app/build/`, which
-any clean throws away. `--no-mapping` skips it, for if minification is ever turned off.
+One release is one folder, so it is kept, copied or removed as a unit, and no mapping
+can be left behind to be matched against the wrong build later. Each file still carries
+the full `ludo-v1.0` name, so one copied out of its folder (onto a phone, into the Play
+Console) still says which build it is. Keeping the mapping matters because `release`
+minifies: without it, an obfuscated stack trace from a shipped build can never be read
+back, and the file is written under `app/build/`, which any clean throws away. `--no-mapping` skips it, for if minification is ever turned off.
 
 It is deliberately not wired into `assembleRelease`. A release build made while working
 on a feature would otherwise overwrite the archived APK of the same version, leaving a
 file labelled `v1.0` that is not the `v1.0` that shipped — silently. Three things guard
-against that: a dirty working tree produces `ludo-v1.0-dirty-g1a2b3c4.apk` rather than
-the release name, an existing target is never overwritten without `--force`, and an APK
+against that: a dirty working tree archives into `v1.0-dirty-g1a2b3c4/` rather than the
+release's folder, an existing target is never overwritten without `--force`, and an APK
 that came out unsigned is refused outright rather than archived under a release name.
 
 ## Rules

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
 # Build the release APK, or the App Bundle that Google Play takes, and archive it into
-# local/ under a name that says exactly what it is. Run at will; nothing in the build
-# calls this.
+# its release's own folder under local/releases/, under a name that says exactly what it
+# is. Run at will; nothing in the build calls this.
 #
 #   ./scripts/archive-apk.sh              build, verify, archive the APK
 #   ./scripts/archive-apk.sh --aab        the same for the App Bundle (.aab)
@@ -16,12 +16,14 @@
 # Each archive is three files sharing one prefix: the APK, a .sha256, and the R8
 # mapping.txt that turns an obfuscated stack trace from that build back into names.
 # The mapping lives in app/build/ and a clean wipes it, so it is worth nothing unless it
-# is kept with the APK it belongs to.
+# is kept with the APK it belongs to. The APK and the bundle of one release sit side by
+# side in one folder, so a release is kept, copied or deleted as a whole.
 #
-# A clean checkout produces "ludo-v1.0.apk". A dirty working tree produces
-# "ludo-v1.0-dirty-g1a2b3c4.apk", so work in progress can never take the name of a
-# release. If the target already exists the script refuses to overwrite it, which is the
-# case that actually bites: same version, different commit.
+# A clean checkout produces "local/releases/v1.0/ludo-v1.0.apk". A dirty working tree
+# produces "local/releases/v1.0-dirty-g1a2b3c4/ludo-v1.0-dirty-g1a2b3c4.apk", so work in
+# progress can never take the name, or the folder, of a release. If the target already
+# exists the script refuses to overwrite it, which is the case that actually bites: same
+# version, different commit.
 
 set -euo pipefail
 
@@ -55,7 +57,7 @@ else
     TASK=:app:assembleRelease
 fi
 MAP=app/build/outputs/mapping/release/mapping.txt
-DEST=local
+RELEASES=local/releases
 
 # The SDK tools need a JDK, and it is often not on PATH on a machine that only has
 # Android Studio.
@@ -142,6 +144,10 @@ if ! git diff --quiet HEAD 2>/dev/null || [ -n "$(git status --porcelain 2>/dev/
     echo "warning: working tree is dirty; archiving as a work-in-progress build"
 fi
 
+# The folder carries the same version and suffix as the files in it, and the files keep
+# the full name anyway: one copied out of its folder, onto a phone or into an upload
+# form, still says which build it is.
+DEST="$RELEASES/v${VNAME}${SUFFIX}"
 TARGET="$DEST/${NAME}-v${VNAME}${SUFFIX}.$FORMAT"
 mkdir -p "$DEST"
 
@@ -154,9 +160,8 @@ fi
 
 cp "$APK" "$TARGET"
 sha256_of "$TARGET" > "$TARGET.sha256"
-# Named off $TARGET rather than the version, so every file belonging to one archive
-# shares a prefix: "rm local/ludo-v1.0.apk*" takes the whole release and leaves no
-# orphan mapping behind to be matched against the wrong APK later.
+# Named off $TARGET rather than the version, so the APK's mapping and the bundle's
+# mapping, which sit in the same folder, can never be mistaken for one another.
 if [ "$MAPPING" = 1 ]; then
     cp "$MAP" "$TARGET.mapping.txt"
 elif [ -e "$TARGET.mapping.txt" ]; then
