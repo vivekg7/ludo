@@ -60,8 +60,18 @@ build, and the signer fingerprint printed for confirmation.
 
 ```sh
 ./scripts/archive-apk.sh          # build, verify, archive
+./scripts/archive-apk.sh --aab    # the same for the App Bundle Google Play takes
 ./scripts/archive-apk.sh --force  # replace an existing archive
 ```
+
+`--aab` runs `bundleRelease` and archives `ludo-v1.0.aab` the same way, with its own
+`.sha256` and mapping. Play accepts only bundles, so this is the file to upload there; the
+APK stays the file to sideload. A bundle needs different tools to read: its manifest is
+protobuf rather than binary XML, so the version comes from `aapt2 dump xmltree` instead
+of `aapt dump badging`. It is signed as a plain JAR, so the certificate comes from
+`keytool -printcert -jarfile` instead of `apksigner`. With Play App Signing that
+certificate is the upload key's: Play re-signs what it delivers with the app signing key
+it holds.
 
 All three files share the `ludo-v1.0.apk` prefix, so one release is removed as a unit
 and no mapping can be left behind to be matched against the wrong APK later. Keeping the

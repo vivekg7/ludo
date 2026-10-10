@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 #
-# Build the release APK and archive it into local/ under a name that says exactly what
-# it is. Run at will; nothing in the build calls this.
+# Build the release APK, or the App Bundle that Google Play takes, and archive it into
+# local/ under a name that says exactly what it is. Run at will; nothing in the build
+# calls this.
 #
-#   ./scripts/archive-apk.sh              build, verify, archive
+#   ./scripts/archive-apk.sh              build, verify, archive the APK
+#   ./scripts/archive-apk.sh --aab        the same for the App Bundle (.aab)
 #   ./scripts/archive-apk.sh --force      allow replacing an existing archive
-#   ./scripts/archive-apk.sh --no-build   use the APK already on disk
-#   ./scripts/archive-apk.sh --no-mapping archive the APK without its R8 mapping
+#   ./scripts/archive-apk.sh --no-build   use the APK or bundle already on disk
+#   ./scripts/archive-apk.sh --no-mapping archive without the R8 mapping
+#
+# Everything below about the APK holds for the bundle too; only how its version and
+# signature are read differs.
 #
 # Each archive is three files sharing one prefix: the APK, a .sha256, and the R8
 # mapping.txt that turns an obfuscated stack trace from that build back into names.
@@ -26,11 +31,13 @@ usage() { awk 'NR>1 && /^#/ { sub(/^# ?/, ""); print; next } NR>1 { exit }' "$0"
 FORCE=0
 BUILD=1
 MAPPING=1
+FORMAT=apk
 for arg in "$@"; do
     case "$arg" in
         --force)    FORCE=1 ;;
         --no-build) BUILD=0 ;;
         --no-mapping) MAPPING=0 ;;
+        --aab)      FORMAT=aab ;;
         -h|--help)  usage; exit 0 ;;
         *) echo "unknown option: $arg" >&2; exit 2 ;;
     esac
@@ -40,7 +47,13 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$ROOT"
 
 NAME=ludo
-APK=app/build/outputs/apk/release/app-release.apk
+if [ "$FORMAT" = aab ]; then
+    APK=app/build/outputs/bundle/release/app-release.aab
+    TASK=:app:bundleRelease
+else
+    APK=app/build/outputs/apk/release/app-release.apk
+    TASK=:app:assembleRelease
+fi
 MAP=app/build/outputs/mapping/release/mapping.txt
 DEST=local
 
@@ -68,23 +81,44 @@ TOOLS=$(ls -d "$SDK"/build-tools/* 2>/dev/null | sort -V | tail -1 || true)
 [ -n "$TOOLS" ] || { echo "error: no Android build-tools found under $SDK" >&2; exit 1; }
 
 if [ "$BUILD" = 1 ]; then
-    ./gradlew :app:assembleRelease -q
+    ./gradlew "$TASK" -q
 fi
 [ -f "$APK" ] || { echo "error: $APK not found (drop --no-build?)" >&2; exit 1; }
 
 # Version comes from the built APK, never from build.gradle.kts, so the filename cannot
 # disagree with the manifest that actually shipped.
-BADGING=$("$TOOLS/aapt" dump badging "$APK" | head -1)
-VNAME=$(sed -n "s/.*versionName='\([^']*\)'.*/\1/p" <<<"$BADGING")
-VCODE=$(sed -n "s/.*versionCode='\([^']*\)'.*/\1/p" <<<"$BADGING")
-[ -n "$VNAME" ] && [ -n "$VCODE" ] || { echo "error: could not read version from APK" >&2; exit 1; }
+if [ "$FORMAT" = aab ]; then
+    # aapt cannot open a bundle, whose manifest is stored as protobuf rather than binary
+    # XML. aapt2 can dump that, given the manifest and resource table at the root of a
+    # zip, as they would sit in an APK.
+    WORK=$(mktemp -d)
+    trap 'rm -rf "$WORK"' EXIT
+    unzip -q -j "$APK" base/manifest/AndroidManifest.xml base/resources.pb -d "$WORK"
+    (cd "$WORK" && zip -q manifest.zip AndroidManifest.xml resources.pb)
+    TREE=$("$TOOLS/aapt2" dump xmltree --file AndroidManifest.xml "$WORK/manifest.zip")
+    VNAME=$(sed -n 's/.*android:versionName([^)]*)="\([^"]*\)".*/\1/p' <<<"$TREE")
+    VCODE=$(sed -n 's/.*android:versionCode([^)]*)=\([0-9]*\).*/\1/p' <<<"$TREE")
+else
+    BADGING=$("$TOOLS/aapt" dump badging "$APK" | head -1)
+    VNAME=$(sed -n "s/.*versionName='\([^']*\)'.*/\1/p" <<<"$BADGING")
+    VCODE=$(sed -n "s/.*versionCode='\([^']*\)'.*/\1/p" <<<"$BADGING")
+fi
+[ -n "$VNAME" ] && [ -n "$VCODE" ] || { echo "error: could not read version from $APK" >&2; exit 1; }
 
 # Checked before anything is copied. A release build here comes out unsigned whenever
 # local/keystore.properties is absent, and an unsigned APK carrying the release name is
 # the same mislabelled artefact the rest of this script exists to prevent. Reading the
 # fingerprint doubles as the check: no fingerprint, nothing to archive.
-SIGNER=$("$TOOLS/apksigner" verify --print-certs "$APK" 2>/dev/null \
-    | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' || true)
+# A bundle is signed as a plain JAR, which apksigner does not read, so keytool reports
+# its certificate instead. The digest is printed with colons there; they are dropped so
+# both formats print the fingerprint the same way.
+if [ "$FORMAT" = aab ]; then
+    SIGNER=$("${JAVA_HOME:+$JAVA_HOME/bin/}keytool" -printcert -jarfile "$APK" 2>/dev/null \
+        | sed -n 's/^[[:space:]]*SHA256: //p' | head -1 | tr -d ':' | tr 'A-F' 'a-f' || true)
+else
+    SIGNER=$("$TOOLS/apksigner" verify --print-certs "$APK" 2>/dev/null \
+        | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' || true)
+fi
 [ -n "$SIGNER" ] || {
     echo "error: $APK carries no signature." >&2
     echo "       Add local/keystore.properties (see README) and rebuild." >&2
@@ -108,7 +142,7 @@ if ! git diff --quiet HEAD 2>/dev/null || [ -n "$(git status --porcelain 2>/dev/
     echo "warning: working tree is dirty; archiving as a work-in-progress build"
 fi
 
-TARGET="$DEST/${NAME}-v${VNAME}${SUFFIX}.apk"
+TARGET="$DEST/${NAME}-v${VNAME}${SUFFIX}.$FORMAT"
 mkdir -p "$DEST"
 
 if [ -e "$TARGET" ] && [ "$FORCE" != 1 ]; then
